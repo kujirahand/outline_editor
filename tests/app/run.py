@@ -177,6 +177,73 @@ def test_local_storage_restores_last_file(page, base_url: str) -> None:
         raise TestFailure("Stored active file id was not restored from localStorage.")
 
 
+def test_file_picker_groups_files_by_folder(page, base_url: str) -> None:
+    login(page, base_url)
+    page.evaluate("localStorage.removeItem('outlineEditor.activeFileId')")
+    tree = page.evaluate(
+        """async () => {
+            const response = await fetch("api/tree.php", { credentials: "same-origin" });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || "Request failed");
+            }
+            return data;
+        }"""
+    )
+    main_file_id = int(tree["active_file_id"])
+
+    work_file = post_json(page, "api/file_create.php", {"name": "仕事/議事録"})
+    work_file_id = int(work_file["active_file_id"])
+    post_json(
+        page,
+        "api/node_create.php",
+        {
+            "file_id": work_file_id,
+            "parent_id": None,
+            "position": 0,
+            "text": "仕事ファイルの本文",
+        },
+    )
+
+    private_file = post_json(page, "api/file_create.php", {"name": "個人/買い物"})
+    private_file_id = int(private_file["active_file_id"])
+    post_json(
+        page,
+        "api/node_create.php",
+        {
+            "file_id": private_file_id,
+            "parent_id": None,
+            "position": 0,
+            "text": "個人ファイルの本文",
+        },
+    )
+
+    post_json(page, "api/file_switch.php", {"id": main_file_id})
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_selector(".node-text")
+
+    if page.locator("#file-select").count() != 0:
+        raise TestFailure("File switching should use the picker screen instead of a select box.")
+
+    page.locator("#menu-toggle-button").click()
+    page.locator("#file-picker-open-button").click()
+    page.wait_for_selector("#file-picker-panel:not([hidden])")
+
+    groups = page.locator(".file-group-title").all_inner_texts()
+    if "仕事" not in groups or "個人" not in groups:
+        raise TestFailure(f"File picker should show files grouped by folder, got {groups}.")
+
+    labels = page.locator(".file-picker-name").all_inner_texts()
+    if "議事録" not in labels or "買い物" not in labels:
+        raise TestFailure(f"File picker should show file names without folder prefixes, got {labels}.")
+
+    page.locator(f'.file-picker-item[data-file-id="{work_file_id}"]').click()
+    page.wait_for_timeout(300)
+    texts = page.locator(".node-text").all_inner_texts()
+    if "仕事ファイルの本文" not in texts:
+        raise TestFailure("Clicking a file picker item should switch the active outline.")
+
+
 def test_asset_urls_include_update_timestamps(page, base_url: str) -> None:
     login(page, base_url)
     script_src = page.locator('script[src*="assets/app.js"]').get_attribute("src")
@@ -245,6 +312,8 @@ def run_app_tests() -> None:
                 test_composing_enter_does_not_create_node(page, base_url)
                 page = browser.new_page()
                 test_local_storage_restores_last_file(page, base_url)
+                page = browser.new_page()
+                test_file_picker_groups_files_by_folder(page, base_url)
                 page = browser.new_page()
                 test_asset_urls_include_update_timestamps(page, base_url)
                 page = browser.new_page()

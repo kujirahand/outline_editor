@@ -9,10 +9,8 @@
       <div class="topbar-menu">
         <button id="menu-toggle-button" class="menu-toggle-button" type="button" aria-label="メニュー" aria-expanded="false" aria-controls="topbar-menu-panel">☰</button>
         <div id="topbar-menu-panel" class="topbar-menu-panel" hidden>
-          <div class="menu-file-switcher">
-            <select id="file-select" aria-label="ファイル切り替え"></select>
-            <button id="file-create-button" class="secondary-button" type="button">新規</button>
-          </div>
+          <button id="file-picker-open-button" class="menu-item-button file-picker-open-button" type="button">ファイル切替</button>
+          <button id="file-create-button" class="menu-item-button" type="button">新規ファイル</button>
           <button id="add-root-button" class="menu-item-button" type="button">ルート追加</button>
           <button id="export-button" class="menu-item-button" type="button">Markdown</button>
           <form class="menu-item-form" method="post" action="./">
@@ -28,6 +26,19 @@
   <main class="editor-shell">
     <section id="outline" class="outline" aria-label="アウトライン"></section>
   </main>
+
+  <div id="file-picker-panel" class="file-picker-panel" role="dialog" aria-modal="true" aria-labelledby="file-picker-title" hidden>
+    <div class="file-picker-dialog">
+      <header class="file-picker-header">
+        <div>
+          <h2 id="file-picker-title">ファイルを選択</h2>
+          <p id="file-picker-current" class="file-picker-current"></p>
+        </div>
+        <button id="file-picker-close-button" class="file-picker-close-button" type="button" aria-label="ファイル選択を閉じる">×</button>
+      </header>
+      <div id="file-picker-list" class="file-picker-list"></div>
+    </div>
+  </div>
 
   <div id="export-panel" class="export-panel" hidden>
     <button id="export-close-button" class="export-close-button" type="button" aria-label="Markdown出力を閉じる">×</button>

@@ -8,7 +8,11 @@
   const exportEl = document.getElementById('export-text');
   const exportCloseButton = document.getElementById('export-close-button');
   const addRootButton = document.getElementById('add-root-button');
-  const fileSelect = document.getElementById('file-select');
+  const filePickerOpenButton = document.getElementById('file-picker-open-button');
+  const filePickerPanel = document.getElementById('file-picker-panel');
+  const filePickerList = document.getElementById('file-picker-list');
+  const filePickerCurrent = document.getElementById('file-picker-current');
+  const filePickerCloseButton = document.getElementById('file-picker-close-button');
   const fileCreateButton = document.getElementById('file-create-button');
   const exportButton = document.getElementById('export-button');
   const menuToggleButton = document.getElementById('menu-toggle-button');
@@ -23,7 +27,8 @@
     rootIds: [],
     activeNodeId: null,
     savingTimers: new Map(),
-    pointer: null
+    pointer: null,
+    filePickerLastFocus: null
   };
 
   function setStatus(text, mode) {
@@ -120,19 +125,105 @@
     state.rootIds = state.children.get('root') || [];
   }
 
-  function renderFileSelect() {
-    const fragment = document.createDocumentFragment();
+  function fileParts(file) {
+    const rawName = String(file.name || '').trim() || '無題';
+    const parts = rawName.split(/[\/／]+/).map((part) => part.trim()).filter(Boolean);
 
-    for (const file of state.files) {
-      const option = document.createElement('option');
-      option.value = String(file.id);
-      option.textContent = file.name;
-      fragment.append(option);
+    if (parts.length <= 1) {
+      return {
+        folder: 'フォルダなし',
+        name: parts[0] || rawName
+      };
     }
 
-    fileSelect.replaceChildren(fragment);
-    fileSelect.value = state.activeFileId === null ? '' : String(state.activeFileId);
-    fileSelect.disabled = state.files.length === 0;
+    return {
+      folder: parts.slice(0, -1).join(' / '),
+      name: parts[parts.length - 1]
+    };
+  }
+
+  function activeFileName() {
+    const activeFile = state.files.find((file) => file.id === state.activeFileId);
+    return activeFile ? String(activeFile.name) : '';
+  }
+
+  function groupedFiles() {
+    const groups = new Map();
+
+    for (const file of state.files) {
+      const parts = fileParts(file);
+      if (!groups.has(parts.folder)) {
+        groups.set(parts.folder, []);
+      }
+      groups.get(parts.folder).push({ file, parts });
+    }
+
+    return [...groups.entries()].sort(([folderA], [folderB]) => {
+      if (folderA === 'フォルダなし') {
+        return -1;
+      }
+      if (folderB === 'フォルダなし') {
+        return 1;
+      }
+      return folderA.localeCompare(folderB, 'ja');
+    });
+  }
+
+  function renderFilePicker() {
+    const fragment = document.createDocumentFragment();
+    const currentName = activeFileName();
+    filePickerCurrent.textContent = currentName ? `現在: ${currentName}` : '';
+    filePickerOpenButton.textContent = currentName ? `ファイル: ${currentName}` : 'ファイル切替';
+
+    for (const [folder, entries] of groupedFiles()) {
+      const group = document.createElement('section');
+      group.className = 'file-group';
+
+      const heading = document.createElement('h3');
+      heading.className = 'file-group-title';
+      heading.textContent = folder;
+      group.append(heading);
+
+      const list = document.createElement('div');
+      list.className = 'file-group-list';
+
+      entries.sort((a, b) => {
+        return a.parts.name.localeCompare(b.parts.name, 'ja') || a.file.id - b.file.id;
+      });
+
+      for (const entry of entries) {
+        const button = document.createElement('button');
+        const isActive = entry.file.id === state.activeFileId;
+        button.type = 'button';
+        button.className = 'file-picker-item';
+        button.dataset.fileId = String(entry.file.id);
+        button.setAttribute('aria-current', isActive ? 'true' : 'false');
+        button.disabled = state.files.length === 0;
+
+        const name = document.createElement('span');
+        name.className = 'file-picker-name';
+        name.textContent = entry.parts.name;
+
+        const meta = document.createElement('span');
+        meta.className = 'file-picker-meta';
+        meta.textContent = isActive ? '選択中' : entry.file.updated_at || '';
+
+        button.append(name, meta);
+        list.append(button);
+      }
+
+      group.append(list);
+      fragment.append(group);
+    }
+
+    if (state.files.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'file-picker-empty';
+      empty.textContent = 'ファイルがありません。';
+      fragment.append(empty);
+    }
+
+    filePickerList.replaceChildren(fragment);
   }
 
   function hasFileId(files, id) {
@@ -146,7 +237,7 @@
     state.activeNodeId = keepActive && state.activeNodeId !== null && state.nodes.has(state.activeNodeId)
       ? state.activeNodeId
       : (state.rootIds[0] || null);
-    renderFileSelect();
+    renderFilePicker();
     renderTree();
     rememberActiveFileId(state.activeFileId);
   }
@@ -585,6 +676,37 @@
     setMenuOpen(menuPanel.hidden);
   }
 
+  function setFilePickerOpen(isOpen) {
+    filePickerPanel.hidden = !isOpen;
+    document.body.classList.toggle('has-modal', isOpen);
+
+    if (isOpen) {
+      state.filePickerLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setMenuOpen(false);
+      closeNodeMenus();
+      renderFilePicker();
+      const activeButton = filePickerList.querySelector(`.file-picker-item[data-file-id="${state.activeFileId}"]`);
+      const firstButton = filePickerList.querySelector('.file-picker-item');
+      (activeButton || firstButton || filePickerCloseButton).focus();
+      return;
+    }
+
+    if (state.filePickerLastFocus && state.filePickerLastFocus.offsetParent !== null) {
+      state.filePickerLastFocus.focus();
+    } else {
+      menuToggleButton.focus();
+    }
+    state.filePickerLastFocus = null;
+  }
+
+  function openFilePicker() {
+    setFilePickerOpen(true);
+  }
+
+  function closeFilePicker() {
+    setFilePickerOpen(false);
+  }
+
   async function switchFile(id) {
     if (id === state.activeFileId) {
       setMenuOpen(false);
@@ -598,7 +720,7 @@
       setMenuOpen(false);
       setStatus('保存済み', 'saved');
     } catch (error) {
-      renderFileSelect();
+      renderFilePicker();
       setStatus('切り替え失敗', 'error');
       console.error(error);
     }
@@ -615,6 +737,7 @@
       const data = await apiPost('api/file_create.php', { name });
       applyTreeResponse(data, false);
       setMenuOpen(false);
+      setFilePickerOpen(true);
       setStatus('保存済み', 'saved');
     } catch (error) {
       setStatus('作成失敗', 'error');
@@ -736,11 +859,25 @@
     setMenuOpen(false);
   });
 
-  fileSelect.addEventListener('change', async () => {
-    await switchFile(Number(fileSelect.value));
-  });
+  filePickerOpenButton.addEventListener('click', openFilePicker);
 
   fileCreateButton.addEventListener('click', createFile);
+
+  filePickerCloseButton.addEventListener('click', closeFilePicker);
+
+  filePickerPanel.addEventListener('click', async (event) => {
+    if (event.target === filePickerPanel) {
+      closeFilePicker();
+      return;
+    }
+
+    const button = event.target.closest('.file-picker-item');
+    if (!button) {
+      return;
+    }
+    await switchFile(Number(button.dataset.fileId));
+    closeFilePicker();
+  });
 
   menuToggleButton.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -780,6 +917,11 @@
     if (!menuPanel.hidden) {
       setMenuOpen(false);
       menuToggleButton.focus();
+      return;
+    }
+
+    if (!filePickerPanel.hidden) {
+      closeFilePicker();
     }
   });
 
