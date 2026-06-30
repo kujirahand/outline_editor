@@ -202,6 +202,10 @@ textarea:focus-visible,
   border-color: transparent;
 }
 
+.menu-item-form {
+  margin: 0;
+}
+
 .user-name {
   color: var(--muted);
   font-size: 14px;
@@ -294,19 +298,33 @@ textarea:focus-visible,
   opacity: 1;
 }
 
-.export-text {
-  display: none;
+.export-panel {
+  position: relative;
   width: min(980px, calc(100% - 24px));
-  min-height: 160px;
   margin: 0 auto 24px;
-  padding: 12px;
+}
+
+.export-text {
+  display: block;
+  width: 100%;
+  min-height: 160px;
+  padding: 12px 44px 12px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   resize: vertical;
 }
 
-.export-text.is-open {
-  display: block;
+.export-close-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  color: var(--muted);
+  background: var(--panel);
 }
 
 @media (max-width: 640px) {

@@ -4,7 +4,9 @@
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
   const outlineEl = document.getElementById('outline');
   const statusEl = document.getElementById('save-status');
+  const exportPanel = document.getElementById('export-panel');
   const exportEl = document.getElementById('export-text');
+  const exportCloseButton = document.getElementById('export-close-button');
   const addRootButton = document.getElementById('add-root-button');
   const exportButton = document.getElementById('export-button');
   const menuToggleButton = document.getElementById('menu-toggle-button');
@@ -387,9 +389,13 @@
     }
 
     exportEl.value = lines.join('\n');
-    exportEl.classList.toggle('is-open', exportEl.value.length > 0);
+    exportPanel.hidden = exportEl.value.length === 0;
     exportEl.focus();
     exportEl.select();
+  }
+
+  function closeExportPanel() {
+    exportPanel.hidden = true;
   }
 
   function setMenuOpen(isOpen) {
@@ -516,6 +522,8 @@
     exportMarkdown();
     setMenuOpen(false);
   });
+
+  exportCloseButton.addEventListener('click', closeExportPanel);
 
   document.addEventListener('click', (event) => {
     if (menuPanel.hidden || event.target.closest('.topbar-menu')) {
