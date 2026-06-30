@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/lib/api.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    json_response(['ok' => false, 'error' => 'GET required'], 405);
-}
-
 $user = require_api_user();
-$file = current_outline_file($user);
+$input = require_json_post();
+$fileId = input_int($input, 'id');
+$file = select_outline_file($user, $fileId);
+if (!$file) {
+    json_response(['ok' => false, 'error' => 'File not found'], 404);
+}
 $pdo = outline_db($user, $file);
 
 json_response([

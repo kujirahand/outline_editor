@@ -51,6 +51,20 @@ function require_json_post(): array
     return read_json_body();
 }
 
+function request_outline_file(array $user, array $input): array
+{
+    if (!array_key_exists('file_id', $input)) {
+        return current_outline_file($user);
+    }
+
+    $fileId = input_int($input, 'file_id');
+    $file = get_outline_file($user, $fileId);
+    if (!$file) {
+        json_response(['ok' => false, 'error' => 'File not found'], 404);
+    }
+    return $file;
+}
+
 function input_int(array $input, string $key, bool $nullable = false): ?int
 {
     if (!array_key_exists($key, $input)) {

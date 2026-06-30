@@ -32,7 +32,8 @@ function write_sibling_order(PDO $pdo, ?int $parentId, array $ids): void
 
 $user = require_api_user();
 $input = require_json_post();
-$pdo = outline_db($user);
+$file = request_outline_file($user, $input);
+$pdo = outline_db($user, $file);
 
 $id = input_int($input, 'id');
 $newParentId = input_int($input, 'parent_id', true);

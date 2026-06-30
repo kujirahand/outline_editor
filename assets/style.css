@@ -106,8 +106,7 @@ textarea:focus-visible,
   border-radius: 6px;
 }
 
-.login-panel button,
-.toolbar button {
+.login-panel button {
   min-height: 38px;
   padding: 7px 12px;
   background: var(--accent);
@@ -180,12 +179,29 @@ textarea:focus-visible,
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  min-width: 160px;
+  min-width: 230px;
   padding: 6px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
   box-shadow: 0 12px 30px rgba(32, 37, 31, 0.12);
+}
+
+.menu-file-switcher {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+}
+
+.menu-file-switcher select {
+  min-width: 0;
+  width: 100%;
+  min-height: 34px;
+  padding: 5px 28px 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
 }
 
 .menu-item-button {
@@ -206,6 +222,12 @@ textarea:focus-visible,
   margin: 0;
 }
 
+.menu-item-form {
+  border-top: 1px solid #edf0eb;
+  padding-top: 4px;
+  margin-top: 4px;
+}
+
 .user-name {
   color: var(--muted);
   font-size: 14px;
@@ -220,12 +242,6 @@ textarea:focus-visible,
   width: min(980px, 100%);
   margin: 0 auto;
   padding: 14px 12px 32px;
-}
-
-.toolbar {
-  display: flex;
-  gap: 8px;
-  padding: 0 0 10px;
 }
 
 .outline {
@@ -343,6 +359,10 @@ textarea:focus-visible,
 
   .editor-shell {
     padding: 10px 8px 28px;
+  }
+
+  .topbar-menu-panel {
+    max-width: calc(100vw - 24px);
   }
 
   .node {

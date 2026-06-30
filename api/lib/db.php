@@ -42,6 +42,18 @@ function users_db(): PDO
             updated_at TEXT NOT NULL
         )'
     );
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS outline_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            file_key TEXT NOT NULL,
+            name TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (user_id, file_key),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )'
+    );
 
     ensure_default_user($pdo);
     return $pdo;
@@ -68,7 +80,12 @@ function ensure_default_user(PDO $pdo): void
         ':updated_at' => $now,
     ]);
 
-    ensure_user_storage(['user_dir' => 'demo']);
+    $user = [
+        'id' => (int)$pdo->lastInsertId(),
+        'user_dir' => 'demo',
+    ];
+    ensure_user_storage($user);
+    ensure_default_outline_file($user);
 }
 
 function find_user_by_id(int $id): ?array
@@ -105,19 +122,169 @@ function ensure_user_storage(array $user): void
 {
     $baseDir = user_base_dir($user);
     $uploadDir = $baseDir . '/upload';
+    $outlinesDir = $baseDir . '/outlines';
 
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0775, true);
     }
+    if (!is_dir($outlinesDir)) {
+        mkdir($outlinesDir, 0775, true);
+    }
 }
 
-function outline_db(array $user): PDO
+function user_id(array $user): int
+{
+    $id = (int)($user['id'] ?? 0);
+    if ($id <= 0) {
+        throw new RuntimeException('Invalid user');
+    }
+    return $id;
+}
+
+function validate_file_key(string $fileKey): void
+{
+    if (!preg_match('/\A[a-zA-Z0-9_-]+\z/', $fileKey)) {
+        throw new RuntimeException('Invalid file key');
+    }
+}
+
+function ensure_default_outline_file(array $user): void
+{
+    $userId = user_id($user);
+    $pdo = users_db();
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM outline_files WHERE user_id = :user_id');
+    $stmt->execute([':user_id' => $userId]);
+
+    if ((int)$stmt->fetchColumn() > 0) {
+        return;
+    }
+
+    $now = now_text();
+    $insert = $pdo->prepare(
+        'INSERT INTO outline_files (user_id, file_key, name, created_at, updated_at)
+         VALUES (:user_id, :file_key, :name, :created_at, :updated_at)'
+    );
+    $insert->execute([
+        ':user_id' => $userId,
+        ':file_key' => 'index',
+        ':name' => 'メイン',
+        ':created_at' => $now,
+        ':updated_at' => $now,
+    ]);
+}
+
+function fetch_outline_files(array $user): array
+{
+    ensure_default_outline_file($user);
+
+    $stmt = users_db()->prepare(
+        'SELECT id, name, created_at, updated_at
+         FROM outline_files
+         WHERE user_id = :user_id
+         ORDER BY id'
+    );
+    $stmt->execute([':user_id' => user_id($user)]);
+
+    return array_map(static function (array $row): array {
+        return [
+            'id' => (int)$row['id'],
+            'name' => (string)$row['name'],
+            'created_at' => (string)$row['created_at'],
+            'updated_at' => (string)$row['updated_at'],
+        ];
+    }, $stmt->fetchAll());
+}
+
+function get_outline_file(array $user, int $id): ?array
+{
+    ensure_default_outline_file($user);
+
+    $stmt = users_db()->prepare(
+        'SELECT id, user_id, file_key, name, created_at, updated_at
+         FROM outline_files
+         WHERE user_id = :user_id AND id = :id'
+    );
+    $stmt->execute([
+        ':user_id' => user_id($user),
+        ':id' => $id,
+    ]);
+    $file = $stmt->fetch();
+    return $file ?: null;
+}
+
+function first_outline_file(array $user): array
+{
+    ensure_default_outline_file($user);
+
+    $stmt = users_db()->prepare(
+        'SELECT id, user_id, file_key, name, created_at, updated_at
+         FROM outline_files
+         WHERE user_id = :user_id
+         ORDER BY id
+         LIMIT 1'
+    );
+    $stmt->execute([':user_id' => user_id($user)]);
+    $file = $stmt->fetch();
+    if (!$file) {
+        throw new RuntimeException('Outline file was not initialized');
+    }
+    return $file;
+}
+
+function create_outline_file(array $user, string $name): array
+{
+    ensure_user_storage($user);
+    ensure_default_outline_file($user);
+
+    $name = trim($name);
+    if ($name === '') {
+        $name = '無題';
+    }
+    $pdo = users_db();
+    $now = now_text();
+    do {
+        $fileKey = bin2hex(random_bytes(12));
+        $stmt = $pdo->prepare(
+            'INSERT OR IGNORE INTO outline_files (user_id, file_key, name, created_at, updated_at)
+             VALUES (:user_id, :file_key, :name, :created_at, :updated_at)'
+        );
+        $stmt->execute([
+            ':user_id' => user_id($user),
+            ':file_key' => $fileKey,
+            ':name' => $name,
+            ':created_at' => $now,
+            ':updated_at' => $now,
+        ]);
+    } while ($stmt->rowCount() === 0);
+
+    $file = get_outline_file($user, (int)$pdo->lastInsertId());
+    if (!$file) {
+        throw new RuntimeException('Outline file was not created');
+    }
+
+    outline_db($user, $file);
+    return $file;
+}
+
+function outline_file_path(array $user, array $file): string
+{
+    $fileKey = (string)($file['file_key'] ?? '');
+    validate_file_key($fileKey);
+
+    $baseDir = user_base_dir($user);
+    if ($fileKey === 'index') {
+        return $baseDir . '/index.sqlite';
+    }
+    return $baseDir . '/outlines/' . $fileKey . '.sqlite';
+}
+
+function outline_db(array $user, ?array $file = null): PDO
 {
     static $connections = [];
 
-    $baseDir = user_base_dir($user);
     ensure_user_storage($user);
-    $path = $baseDir . '/index.sqlite';
+    $file = $file ?: first_outline_file($user);
+    $path = outline_file_path($user, $file);
 
     if (isset($connections[$path])) {
         return $connections[$path];

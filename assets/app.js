@@ -8,11 +8,15 @@
   const exportEl = document.getElementById('export-text');
   const exportCloseButton = document.getElementById('export-close-button');
   const addRootButton = document.getElementById('add-root-button');
+  const fileSelect = document.getElementById('file-select');
+  const fileCreateButton = document.getElementById('file-create-button');
   const exportButton = document.getElementById('export-button');
   const menuToggleButton = document.getElementById('menu-toggle-button');
   const menuPanel = document.getElementById('topbar-menu-panel');
 
   const state = {
+    files: [],
+    activeFileId: null,
     nodes: new Map(),
     children: new Map(),
     rootIds: [],
@@ -33,6 +37,10 @@
       throw new Error(data.error || 'Request failed');
     }
     return data;
+  }
+
+  function activeFilePayload(extra) {
+    return Object.assign({ file_id: state.activeFileId }, extra || {});
   }
 
   async function apiPost(path, body) {
@@ -79,6 +87,32 @@
     }
 
     state.rootIds = state.children.get('root') || [];
+  }
+
+  function renderFileSelect() {
+    const fragment = document.createDocumentFragment();
+
+    for (const file of state.files) {
+      const option = document.createElement('option');
+      option.value = String(file.id);
+      option.textContent = file.name;
+      fragment.append(option);
+    }
+
+    fileSelect.replaceChildren(fragment);
+    fileSelect.value = state.activeFileId === null ? '' : String(state.activeFileId);
+    fileSelect.disabled = state.files.length === 0;
+  }
+
+  function applyTreeResponse(data, keepActive) {
+    state.files = data.files || [];
+    state.activeFileId = data.active_file_id || null;
+    rebuildState(data.nodes || []);
+    state.activeNodeId = keepActive && state.activeNodeId !== null && state.nodes.has(state.activeNodeId)
+      ? state.activeNodeId
+      : (state.rootIds[0] || null);
+    renderFileSelect();
+    renderTree();
   }
 
   function getChildren(parentId) {
@@ -225,9 +259,7 @@
     try {
       setStatus('読み込み中', 'saving');
       const data = await apiGet('api/tree.php');
-      rebuildState(data.nodes);
-      state.activeNodeId = state.rootIds[0] || null;
-      renderTree();
+      applyTreeResponse(data, false);
       setStatus('保存済み', 'saved');
     } catch (error) {
       setStatus('読み込み失敗', 'error');
@@ -236,11 +268,11 @@
   }
 
   async function createNode(parentId, position, text) {
-    const data = await apiPost('api/node_create.php', {
+    const data = await apiPost('api/node_create.php', activeFilePayload({
       parent_id: parentId,
       position,
       text: text || ''
-    });
+    }));
     rebuildState(data.nodes);
     state.activeNodeId = data.node.id;
     renderTree();
@@ -297,7 +329,7 @@
   async function moveNode(id, parentId, position) {
     try {
       setStatus('保存中', 'saving');
-      const data = await apiPost('api/node_move.php', { id, parent_id: parentId, position });
+      const data = await apiPost('api/node_move.php', activeFilePayload({ id, parent_id: parentId, position }));
       rebuildState(data.nodes);
       state.activeNodeId = id;
       renderTree();
@@ -310,25 +342,27 @@
 
   function scheduleSaveText(id, text) {
     const node = state.nodes.get(id);
+    const fileId = state.activeFileId;
+    const timerKey = `${fileId}:${id}`;
     if (node) {
       node.text = text;
     }
 
-    if (state.savingTimers.has(id)) {
-      clearTimeout(state.savingTimers.get(id));
+    if (state.savingTimers.has(timerKey)) {
+      clearTimeout(state.savingTimers.get(timerKey));
     }
 
     setStatus('未保存', 'dirty');
-    state.savingTimers.set(id, setTimeout(async () => {
+    state.savingTimers.set(timerKey, setTimeout(async () => {
       try {
         setStatus('保存中', 'saving');
-        await apiPost('api/node_update.php', { id, text });
+        await apiPost('api/node_update.php', { file_id: fileId, id, text });
         setStatus('保存済み', 'saved');
       } catch (error) {
         setStatus('保存失敗', 'error');
         console.error(error);
       } finally {
-        state.savingTimers.delete(id);
+        state.savingTimers.delete(timerKey);
       }
     }, 500));
   }
@@ -344,7 +378,7 @@
     renderTree();
 
     try {
-      await apiPost('api/node_update.php', { id, collapsed });
+      await apiPost('api/node_update.php', activeFilePayload({ id, collapsed }));
       setStatus('保存済み', 'saved');
     } catch (error) {
       setStatus('保存失敗', 'error');
@@ -359,7 +393,7 @@
 
     try {
       setStatus('保存中', 'saving');
-      const data = await apiPost('api/node_delete.php', { id });
+      const data = await apiPost('api/node_delete.php', activeFilePayload({ id }));
       rebuildState(data.nodes);
       state.activeNodeId = nextFocus && state.nodes.has(nextFocus) ? nextFocus : (state.rootIds[0] || null);
       renderTree();
@@ -405,6 +439,43 @@
 
   function toggleMenu() {
     setMenuOpen(menuPanel.hidden);
+  }
+
+  async function switchFile(id) {
+    if (id === state.activeFileId) {
+      setMenuOpen(false);
+      return;
+    }
+
+    try {
+      setStatus('読み込み中', 'saving');
+      const data = await apiPost('api/file_switch.php', { id });
+      applyTreeResponse(data, false);
+      setMenuOpen(false);
+      setStatus('保存済み', 'saved');
+    } catch (error) {
+      renderFileSelect();
+      setStatus('切り替え失敗', 'error');
+      console.error(error);
+    }
+  }
+
+  async function createFile() {
+    const name = window.prompt('ファイル名', '無題');
+    if (name === null) {
+      return;
+    }
+
+    try {
+      setStatus('作成中', 'saving');
+      const data = await apiPost('api/file_create.php', { name });
+      applyTreeResponse(data, false);
+      setMenuOpen(false);
+      setStatus('保存済み', 'saved');
+    } catch (error) {
+      setStatus('作成失敗', 'error');
+      console.error(error);
+    }
   }
 
   outlineEl.addEventListener('focusin', (event) => {
@@ -511,7 +582,14 @@
   addRootButton.addEventListener('click', async () => {
     setStatus('保存中', 'saving');
     await createNode(null, state.rootIds.length, '');
+    setMenuOpen(false);
   });
+
+  fileSelect.addEventListener('change', async () => {
+    await switchFile(Number(fileSelect.value));
+  });
+
+  fileCreateButton.addEventListener('click', createFile);
 
   menuToggleButton.addEventListener('click', (event) => {
     event.stopPropagation();

@@ -9,6 +9,11 @@
       <div class="topbar-menu">
         <button id="menu-toggle-button" class="menu-toggle-button" type="button" aria-label="メニュー" aria-expanded="false" aria-controls="topbar-menu-panel">☰</button>
         <div id="topbar-menu-panel" class="topbar-menu-panel" hidden>
+          <div class="menu-file-switcher">
+            <select id="file-select" aria-label="ファイル切り替え"></select>
+            <button id="file-create-button" class="secondary-button" type="button">新規</button>
+          </div>
+          <button id="add-root-button" class="menu-item-button" type="button">ルート追加</button>
           <button id="export-button" class="menu-item-button" type="button">Markdown</button>
           <form class="menu-item-form" method="post" action="./">
             <input type="hidden" name="action" value="logout">
@@ -21,9 +26,6 @@
   </header>
 
   <main class="editor-shell">
-    <div class="toolbar" aria-label="編集ツール">
-      <button id="add-root-button" type="button">ルート追加</button>
-    </div>
     <section id="outline" class="outline" aria-label="アウトライン"></section>
   </main>
 

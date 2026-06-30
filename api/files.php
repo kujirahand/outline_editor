@@ -10,11 +10,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 $user = require_api_user();
 $file = current_outline_file($user);
-$pdo = outline_db($user, $file);
 
 json_response([
     'ok' => true,
     'active_file_id' => (int)$file['id'],
     'files' => fetch_outline_files($user),
-    'nodes' => fetch_nodes($pdo),
 ]);

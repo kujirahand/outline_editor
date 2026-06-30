@@ -36,6 +36,7 @@ function current_user(): ?array
     }
 
     ensure_user_storage($user);
+    ensure_default_outline_file($user);
     return $user;
 }
 
@@ -48,9 +49,37 @@ function login_user(string $loginId, string $password): bool
 
     session_regenerate_id(true);
     $_SESSION['user_id'] = (int)$user['id'];
+    unset($_SESSION['outline_file_id']);
     csrf_token();
     ensure_user_storage($user);
+    ensure_default_outline_file($user);
     return true;
+}
+
+function current_outline_file(array $user): array
+{
+    $fileId = isset($_SESSION['outline_file_id']) ? (int)$_SESSION['outline_file_id'] : 0;
+    if ($fileId > 0) {
+        $file = get_outline_file($user, $fileId);
+        if ($file) {
+            return $file;
+        }
+    }
+
+    $file = first_outline_file($user);
+    $_SESSION['outline_file_id'] = (int)$file['id'];
+    return $file;
+}
+
+function select_outline_file(array $user, int $fileId): ?array
+{
+    $file = get_outline_file($user, $fileId);
+    if (!$file) {
+        return null;
+    }
+
+    $_SESSION['outline_file_id'] = (int)$file['id'];
+    return $file;
 }
 
 function logout_user(): void
@@ -72,4 +101,3 @@ function logout_user(): void
 
     session_destroy();
 }
-

@@ -161,6 +161,19 @@ function find_node(array $nodes, int $id): array
     throw new TestFailure("Node was not found: $id");
 }
 
+/**
+ * @param array<int, array<string, mixed>> $nodes
+ */
+function has_node_text(array $nodes, string $text): bool
+{
+    foreach ($nodes as $node) {
+        if (($node['text'] ?? null) === $text) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function remove_tree(string $path): void
 {
     if (!is_dir($path)) {
@@ -284,7 +297,10 @@ function run_api_tests(): void
 
         $tree = expect_json($client->request('GET', '/api/tree.php'), 200);
         assert_same(true, $tree['ok'], 'Tree API should succeed after login.');
+        assert_true(is_int($tree['active_file_id']), 'Tree API should return active file id.');
+        assert_true(count($tree['files']) >= 1, 'Default file should exist.');
         assert_true(count($tree['nodes']) >= 3, 'Default outline seed should exist.');
+        $mainFileId = (int)$tree['active_file_id'];
 
         $missingCsrf = expect_json($client->request(
             'POST',
@@ -295,6 +311,7 @@ function run_api_tests(): void
         assert_same('Invalid CSRF token', $missingCsrf['error'], 'Missing CSRF error mismatch.');
 
         $createdParent = expect_json(api_post($client, '/api/node_create.php', [
+            'file_id' => $mainFileId,
             'parent_id' => null,
             'position' => 0,
             'text' => 'Parent',
@@ -305,6 +322,7 @@ function run_api_tests(): void
         assert_same(0, $createdParent['node']['position'], 'Created parent should be inserted at position 0.');
 
         $createdChild = expect_json(api_post($client, '/api/node_create.php', [
+            'file_id' => $mainFileId,
             'parent_id' => null,
             'position' => 1,
             'text' => 'Child',
@@ -312,6 +330,7 @@ function run_api_tests(): void
         $childId = (int)$createdChild['node']['id'];
 
         $updated = expect_json(api_post($client, '/api/node_update.php', [
+            'file_id' => $mainFileId,
             'id' => $childId,
             'text' => 'Updated child',
             'collapsed' => true,
@@ -320,6 +339,7 @@ function run_api_tests(): void
         assert_same(1, $updated['node']['collapsed'], 'Collapsed flag mismatch.');
 
         $moved = expect_json(api_post($client, '/api/node_move.php', [
+            'file_id' => $mainFileId,
             'id' => $childId,
             'parent_id' => $parentId,
             'position' => 0,
@@ -329,6 +349,7 @@ function run_api_tests(): void
         assert_same(0, $movedChild['position'], 'Moved child position mismatch.');
 
         $cycle = expect_json(api_post($client, '/api/node_move.php', [
+            'file_id' => $mainFileId,
             'id' => $parentId,
             'parent_id' => $childId,
             'position' => 0,
@@ -336,12 +357,41 @@ function run_api_tests(): void
         assert_same('Cannot move node under descendant', $cycle['error'], 'Cycle prevention error mismatch.');
 
         $deleted = expect_json(api_post($client, '/api/node_delete.php', [
+            'file_id' => $mainFileId,
             'id' => $childId,
         ], $csrfToken), 200);
         assert_same(true, $deleted['ok'], 'Delete should succeed.');
         foreach ($deleted['nodes'] as $node) {
             assert_true(($node['id'] ?? null) !== $childId, 'Deleted node should not remain in tree.');
         }
+
+        $newFile = expect_json(api_post($client, '/api/file_create.php', [
+            'name' => '作業メモ',
+        ], $csrfToken), 200);
+        assert_same(true, $newFile['ok'], 'File create should succeed.');
+        $newFileId = (int)$newFile['active_file_id'];
+        assert_true($newFileId !== $mainFileId, 'New file should become active.');
+        assert_true(count($newFile['nodes']) >= 3, 'New file should be initialized.');
+
+        $createdInNewFile = expect_json(api_post($client, '/api/node_create.php', [
+            'file_id' => $newFileId,
+            'parent_id' => null,
+            'position' => 0,
+            'text' => 'Only in new file',
+        ], $csrfToken), 200);
+        assert_true(has_node_text($createdInNewFile['nodes'], 'Only in new file'), 'Node should be created in the new file.');
+
+        $switchedMain = expect_json(api_post($client, '/api/file_switch.php', [
+            'id' => $mainFileId,
+        ], $csrfToken), 200);
+        assert_same($mainFileId, $switchedMain['active_file_id'], 'Main file should become active.');
+        assert_true(!has_node_text($switchedMain['nodes'], 'Only in new file'), 'New file node should not appear in main file.');
+
+        $switchedNew = expect_json(api_post($client, '/api/file_switch.php', [
+            'id' => $newFileId,
+        ], $csrfToken), 200);
+        assert_same($newFileId, $switchedNew['active_file_id'], 'New file should become active again.');
+        assert_true(has_node_text($switchedNew['nodes'], 'Only in new file'), 'New file node should remain in the new file.');
     } finally {
         proc_terminate($process);
         proc_close($process);

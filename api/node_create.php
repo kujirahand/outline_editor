@@ -6,7 +6,8 @@ require_once __DIR__ . '/lib/api.php';
 
 $user = require_api_user();
 $input = require_json_post();
-$pdo = outline_db($user);
+$file = request_outline_file($user, $input);
+$pdo = outline_db($user, $file);
 
 $parentId = input_int($input, 'parent_id', true);
 $position = max(0, input_int($input, 'position'));
