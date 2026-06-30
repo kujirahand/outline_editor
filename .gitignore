@@ -6,6 +6,7 @@
 
 # the fuelphp document
 /docs/
+/data/
 
 # you may install these packages with `oil package`.
 # http://fuelphp.com/docs/packages/oil/package.html
