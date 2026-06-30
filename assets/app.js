@@ -215,7 +215,7 @@
     actions.className = 'node-actions';
 
     const menuId = `node-menu-${id}`;
-    const menuButton = makeIconButton('⋯', '操作', (event) => {
+    const menuButton = makeIconButton('←→↓', '←→↓', (event) => {
       event.stopPropagation();
       toggleNodeMenu(id);
     });

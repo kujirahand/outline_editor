@@ -179,7 +179,7 @@ def test_local_storage_restores_last_file(page, base_url: str) -> None:
 def test_node_context_menu_adds_sibling(page, base_url: str) -> None:
     login(page, base_url)
     before = page.locator(".node-text").count()
-    page.get_by_role("button", name="操作").first.click()
+    page.get_by_role("button", name="←→↓").first.click()
 
     if page.locator(".node-actions .icon-button:not(.node-menu-button)").count() != 0:
         raise TestFailure("Node actions should be collapsed into a single menu button.")
