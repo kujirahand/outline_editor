@@ -323,7 +323,9 @@
 
     menu.append(
       makeNodeMenuButton('←', '親に戻す', () => outdentNode(id)),
-      makeNodeMenuButton('→', '子にする', () => indentNode(id))
+      makeNodeMenuButton('→', '子にする', () => indentNode(id)),
+      makeNodeMenuButton('↑', '上に移動', () => moveUpNode(id)),
+      makeNodeMenuButton('↓', '下に移動', () => moveDownNode(id))
     );
 
     actions.append(menuButton, menu);
@@ -526,6 +528,50 @@
     const parentSiblings = getChildren(newParentId);
     const newPosition = parentSiblings.indexOf(parent.id) + 1;
     await moveNode(id, newParentId, newPosition);
+  }
+
+  async function moveUpNode(id) {
+    const node = state.nodes.get(id);
+    if (!node) {
+      return;
+    }
+
+    const siblings = getChildren(node.parent_id);
+    const index = siblings.indexOf(id);
+    if (index > 0) {
+      // 同じ階層の上の兄弟と入れ替える
+      await moveNode(id, node.parent_id, index - 1);
+    } else if (node.parent_id !== null) {
+      // 親の上の階層（親の直前）に移動する
+      const parent = state.nodes.get(node.parent_id);
+      if (parent) {
+        const parentSiblings = getChildren(parent.parent_id);
+        const parentIndex = parentSiblings.indexOf(parent.id);
+        await moveNode(id, parent.parent_id, parentIndex);
+      }
+    }
+  }
+
+  async function moveDownNode(id) {
+    const node = state.nodes.get(id);
+    if (!node) {
+      return;
+    }
+
+    const siblings = getChildren(node.parent_id);
+    const index = siblings.indexOf(id);
+    if (index >= 0 && index < siblings.length - 1) {
+      // 同じ階層の下の兄弟と入れ替える
+      await moveNode(id, node.parent_id, index + 1);
+    } else if (node.parent_id !== null) {
+      // 親の上の階層（親の直後）に移動する
+      const parent = state.nodes.get(node.parent_id);
+      if (parent) {
+        const parentSiblings = getChildren(parent.parent_id);
+        const parentIndex = parentSiblings.indexOf(parent.id);
+        await moveNode(id, parent.parent_id, parentIndex + 1);
+      }
+    }
   }
 
   async function moveNode(id, parentId, position) {
