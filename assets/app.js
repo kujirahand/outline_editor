@@ -13,6 +13,7 @@
   const exportButton = document.getElementById('export-button');
   const menuToggleButton = document.getElementById('menu-toggle-button');
   const menuPanel = document.getElementById('topbar-menu-panel');
+  const activeFileStorageKey = 'outlineEditor.activeFileId';
 
   const state = {
     files: [],
@@ -30,6 +31,35 @@
     statusEl.dataset.mode = mode || '';
   }
 
+  function readStoredActiveFileId() {
+    try {
+      const value = window.localStorage.getItem(activeFileStorageKey);
+      return value && /^\d+$/.test(value) ? Number(value) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function rememberActiveFileId(fileId) {
+    if (fileId === null || fileId === undefined) {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(activeFileStorageKey, String(fileId));
+    } catch (error) {
+      console.warn('Cannot save active file id.', error);
+    }
+  }
+
+  function forgetActiveFileId() {
+    try {
+      window.localStorage.removeItem(activeFileStorageKey);
+    } catch (error) {
+      console.warn('Cannot remove active file id.', error);
+    }
+  }
+
   async function apiGet(path) {
     const response = await fetch(path, { credentials: 'same-origin' });
     const data = await response.json();
@@ -40,6 +70,7 @@
   }
 
   function activeFilePayload(extra) {
+    rememberActiveFileId(state.activeFileId);
     return Object.assign({ file_id: state.activeFileId }, extra || {});
   }
 
@@ -104,6 +135,10 @@
     fileSelect.disabled = state.files.length === 0;
   }
 
+  function hasFileId(files, id) {
+    return files.some((file) => file.id === id);
+  }
+
   function applyTreeResponse(data, keepActive) {
     state.files = data.files || [];
     state.activeFileId = data.active_file_id || null;
@@ -113,6 +148,7 @@
       : (state.rootIds[0] || null);
     renderFileSelect();
     renderTree();
+    rememberActiveFileId(state.activeFileId);
   }
 
   function getChildren(parentId) {
@@ -258,7 +294,17 @@
   async function loadTree() {
     try {
       setStatus('読み込み中', 'saving');
-      const data = await apiGet('api/tree.php');
+      let data = await apiGet('api/tree.php');
+      const storedFileId = readStoredActiveFileId();
+
+      if (storedFileId !== null && hasFileId(data.files || [], storedFileId)) {
+        if (storedFileId !== data.active_file_id) {
+          data = await apiPost('api/file_switch.php', { id: storedFileId });
+        }
+      } else if (storedFileId !== null) {
+        forgetActiveFileId();
+      }
+
       applyTreeResponse(data, false);
       setStatus('保存済み', 'saved');
     } catch (error) {

@@ -112,6 +112,70 @@ def test_composing_enter_does_not_create_node(page, base_url: str) -> None:
         raise TestFailure("Composing Enter should not create a new node.")
 
 
+def post_json(page, path: str, payload: dict) -> dict:
+    csrf_token = page.locator('meta[name="csrf-token"]').get_attribute("content")
+    return page.evaluate(
+        """async ({ path, payload, csrfToken }) => {
+            const response = await fetch(path, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-Token": csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || "Request failed");
+            }
+            return data;
+        }""",
+        {"path": path, "payload": payload, "csrfToken": csrf_token},
+    )
+
+
+def test_local_storage_restores_last_file(page, base_url: str) -> None:
+    login(page, base_url)
+    page.evaluate("localStorage.removeItem('outlineEditor.activeFileId')")
+    tree = page.evaluate(
+        """async () => {
+            const response = await fetch("api/tree.php", { credentials: "same-origin" });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || "Request failed");
+            }
+            return data;
+        }"""
+    )
+    main_file_id = int(tree["active_file_id"])
+
+    created_file = post_json(page, "api/file_create.php", {"name": "保存対象"})
+    stored_file_id = int(created_file["active_file_id"])
+    post_json(
+        page,
+        "api/node_create.php",
+        {
+            "file_id": stored_file_id,
+            "parent_id": None,
+            "position": 0,
+            "text": "localStorageで復元",
+        },
+    )
+
+    post_json(page, "api/file_switch.php", {"id": main_file_id})
+    page.evaluate(
+        "(fileId) => localStorage.setItem('outlineEditor.activeFileId', String(fileId))",
+        stored_file_id,
+    )
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_selector(".node-text")
+
+    texts = page.locator(".node-text").all_inner_texts()
+    if "localStorageで復元" not in texts:
+        raise TestFailure("Stored active file id was not restored from localStorage.")
+
+
 def run_app_tests() -> None:
     try:
         from playwright.sync_api import sync_playwright
@@ -139,6 +203,8 @@ def run_app_tests() -> None:
                 test_japanese_enter_persists(page, base_url)
                 page = browser.new_page()
                 test_composing_enter_does_not_create_node(page, base_url)
+                page = browser.new_page()
+                test_local_storage_restores_last_file(page, base_url)
             finally:
                 browser.close()
     finally:
