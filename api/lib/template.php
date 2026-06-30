@@ -7,10 +7,15 @@ function h(string $value): string
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
-function asset_url(string $path): string
+function asset_updated_at(string $path): string
 {
     $fullPath = __DIR__ . '/../../' . ltrim($path, '/');
-    $version = is_file($fullPath) ? (string)filemtime($fullPath) : '1';
+    return is_file($fullPath) ? date('YmdHis', (int)filemtime($fullPath)) : '00000000000000';
+}
+
+function asset_url(string $path): string
+{
+    $version = asset_updated_at($path);
     return $path . '?v=' . rawurlencode($version);
 }
 
