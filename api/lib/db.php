@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-const OUTLINE_DATA_DIR = __DIR__ . '/../../data';
+define('OUTLINE_DATA_DIR', getenv('OUTLINE_DATA_DIR') ?: __DIR__ . '/../../data');
 
 function now_text(): string
 {

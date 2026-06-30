@@ -7,3 +7,7 @@ default:
 # Start the PHP built-in server for local development.
 serve host=host port=port:
     php -S {{host}}:{{port}} router.php
+
+# Run API tests.
+test:
+    php api/test/run.php
