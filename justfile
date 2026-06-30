@@ -8,6 +8,13 @@ default:
 serve host=host port=port:
     php -S {{host}}:{{port}} router.php
 
-# Run API tests.
-test:
-    php api/test/run.php
+# Run all tests.
+test: test-api test-app
+
+# Run HTTP API tests.
+test-api:
+    php tests/api/run.php
+
+# Run browser app tests. Requires Playwright and Chrome by default.
+test-app:
+    python tests/app/run.py

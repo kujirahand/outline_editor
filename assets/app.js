@@ -340,10 +340,18 @@
     }
   }
 
+  function saveTimerKey(fileId, id) {
+    return `${fileId}:${id}`;
+  }
+
+  async function saveNodeTextNow(id, fileId, text) {
+    await apiPost('api/node_update.php', { file_id: fileId, id, text });
+  }
+
   function scheduleSaveText(id, text) {
     const node = state.nodes.get(id);
     const fileId = state.activeFileId;
-    const timerKey = `${fileId}:${id}`;
+    const timerKey = saveTimerKey(fileId, id);
     if (node) {
       node.text = text;
     }
@@ -356,7 +364,7 @@
     state.savingTimers.set(timerKey, setTimeout(async () => {
       try {
         setStatus('保存中', 'saving');
-        await apiPost('api/node_update.php', { file_id: fileId, id, text });
+        await saveNodeTextNow(id, fileId, text);
         setStatus('保存済み', 'saved');
       } catch (error) {
         setStatus('保存失敗', 'error');
@@ -365,6 +373,28 @@
         state.savingTimers.delete(timerKey);
       }
     }, 500));
+  }
+
+  async function flushNodeText(id, text) {
+    const fileId = state.activeFileId;
+    const timerKey = saveTimerKey(fileId, id);
+    const node = state.nodes.get(id);
+    if (node) {
+      node.text = text;
+    }
+
+    if (state.savingTimers.has(timerKey)) {
+      clearTimeout(state.savingTimers.get(timerKey));
+      state.savingTimers.delete(timerKey);
+    }
+
+    setStatus('保存中', 'saving');
+    try {
+      await saveNodeTextNow(id, fileId, text);
+    } catch (error) {
+      setStatus('保存失敗', 'error');
+      throw error;
+    }
   }
 
   async function toggleNode(id) {
@@ -516,14 +546,20 @@
       return;
     }
 
+    if (event.isComposing || event.keyCode === 229) {
+      return;
+    }
+
     const id = Number(text.dataset.id);
     state.activeNodeId = id;
 
     if (event.key === 'Enter') {
       event.preventDefault();
+      await flushNodeText(id, text.textContent || '');
       await createNodeAfter(id);
     } else if (event.key === 'Tab') {
       event.preventDefault();
+      await flushNodeText(id, text.textContent || '');
       if (event.shiftKey) {
         await outdentNode(id);
       } else {
@@ -537,6 +573,7 @@
       focusVisibleOffset(id, 1);
     } else if (event.key === 'Backspace' && (text.textContent || '') === '') {
       event.preventDefault();
+      await flushNodeText(id, '');
       await deleteNode(id);
     }
   });
