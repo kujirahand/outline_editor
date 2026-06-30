@@ -176,10 +176,9 @@ def test_local_storage_restores_last_file(page, base_url: str) -> None:
         raise TestFailure("Stored active file id was not restored from localStorage.")
 
 
-def test_node_context_menu_adds_sibling(page, base_url: str) -> None:
+def test_node_context_menu_shows_indent_buttons(page, base_url: str) -> None:
     login(page, base_url)
-    before = page.locator(".node-text").count()
-    page.get_by_role("button", name="←→↓").first.click()
+    page.get_by_role("button", name="メニュー").first.click()
 
     if page.locator(".node-actions .icon-button:not(.node-menu-button)").count() != 0:
         raise TestFailure("Node actions should be collapsed into a single menu button.")
@@ -188,14 +187,8 @@ def test_node_context_menu_adds_sibling(page, base_url: str) -> None:
     labels = first_menu.locator(".node-menu-item").evaluate_all(
         "(items) => items.map((item) => item.textContent)"
     )
-    if labels != ["→", "←", "↓"]:
-        raise TestFailure(f"Node context menu labels should be arrows, got {labels}.")
-
-    first_menu.get_by_role("menuitem", name="下に追加").click()
-    page.wait_for_function(
-        "(count) => document.querySelectorAll('.node-text').length === count + 1",
-        arg=before,
-    )
+    if labels != ["←", "→"]:
+        raise TestFailure(f"Node context menu labels should be left and right arrows, got {labels}.")
 
 
 def run_app_tests() -> None:
@@ -228,7 +221,7 @@ def run_app_tests() -> None:
                 page = browser.new_page()
                 test_local_storage_restores_last_file(page, base_url)
                 page = browser.new_page()
-                test_node_context_menu_adds_sibling(page, base_url)
+                test_node_context_menu_shows_indent_buttons(page, base_url)
             finally:
                 browser.close()
     finally:

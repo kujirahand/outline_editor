@@ -215,7 +215,7 @@
     actions.className = 'node-actions';
 
     const menuId = `node-menu-${id}`;
-    const menuButton = makeIconButton('←→↓', '←→↓', (event) => {
+    const menuButton = makeIconButton('…', 'メニュー', (event) => {
       event.stopPropagation();
       toggleNodeMenu(id);
     });
@@ -231,9 +231,8 @@
     menu.hidden = true;
 
     menu.append(
-      makeNodeMenuButton('→', '子にする', () => indentNode(id)),
       makeNodeMenuButton('←', '親に戻す', () => outdentNode(id)),
-      makeNodeMenuButton('↓', '下に追加', () => createNodeAfter(id))
+      makeNodeMenuButton('→', '子にする', () => indentNode(id))
     );
 
     actions.append(menuButton, menu);

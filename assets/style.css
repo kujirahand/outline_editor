@@ -290,12 +290,6 @@ textarea:focus-visible,
   cursor: default;
 }
 
-.node-menu-button {
-  width: 48px;
-  min-width: 48px;
-  font-size: 14px;
-}
-
 .node-text {
   min-height: 30px;
   padding: 3px 4px;
