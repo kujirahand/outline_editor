@@ -248,7 +248,7 @@ textarea:focus-visible,
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .node {
@@ -304,6 +304,7 @@ textarea:focus-visible,
 }
 
 .node-actions {
+  position: relative;
   display: flex;
   gap: 2px;
   opacity: 0;
@@ -312,6 +313,35 @@ textarea:focus-visible,
 .node:hover .node-actions,
 .node.is-active .node-actions {
   opacity: 1;
+}
+
+.node-menu-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  min-width: 120px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 12px 24px rgba(32, 37, 31, 0.14);
+}
+
+.node-menu-item {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  text-align: left;
+  white-space: nowrap;
+  border-color: transparent;
+  background: transparent;
+}
+
+.node-menu-item:hover,
+.node-menu-item:focus-visible {
+  background: var(--accent-soft);
+  border-color: transparent;
 }
 
 .export-panel {

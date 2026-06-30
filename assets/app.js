@@ -214,11 +214,29 @@
     const actions = document.createElement('div');
     actions.className = 'node-actions';
 
-    const addButton = makeIconButton('+', '下に追加', () => createNodeAfter(id));
-    const indentButton = makeIconButton('→', '子にする', () => indentNode(id));
-    const outdentButton = makeIconButton('←', '親に戻す', () => outdentNode(id));
+    const menuId = `node-menu-${id}`;
+    const menuButton = makeIconButton('⋯', '操作', (event) => {
+      event.stopPropagation();
+      toggleNodeMenu(id);
+    });
+    menuButton.classList.add('node-menu-button');
+    menuButton.setAttribute('aria-haspopup', 'menu');
+    menuButton.setAttribute('aria-expanded', 'false');
+    menuButton.setAttribute('aria-controls', menuId);
 
-    actions.append(addButton, indentButton, outdentButton);
+    const menu = document.createElement('div');
+    menu.id = menuId;
+    menu.className = 'node-menu-panel';
+    menu.setAttribute('role', 'menu');
+    menu.hidden = true;
+
+    menu.append(
+      makeNodeMenuButton('下に追加', () => createNodeAfter(id)),
+      makeNodeMenuButton('子にする', () => indentNode(id)),
+      makeNodeMenuButton('親に戻す', () => outdentNode(id))
+    );
+
+    actions.append(menuButton, menu);
     row.append(toggle, text, actions);
     parentEl.append(row);
 
@@ -238,6 +256,52 @@
     button.setAttribute('aria-label', title);
     button.addEventListener('click', handler);
     return button;
+  }
+
+  function makeNodeMenuButton(label, handler) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'node-menu-item';
+    button.textContent = label;
+    button.setAttribute('role', 'menuitem');
+    button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      closeNodeMenus();
+      await handler();
+    });
+    return button;
+  }
+
+  function closeNodeMenus(exceptId) {
+    for (const panel of outlineEl.querySelectorAll('.node-menu-panel')) {
+      const row = panel.closest('.node');
+      const id = row ? Number(row.dataset.id) : null;
+      if (exceptId !== undefined && id === exceptId) {
+        continue;
+      }
+      panel.hidden = true;
+      row?.querySelector('.node-menu-button')?.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function toggleNodeMenu(id) {
+    const row = outlineEl.querySelector(`.node[data-id="${id}"]`);
+    const panel = row?.querySelector('.node-menu-panel');
+    const button = row?.querySelector('.node-menu-button');
+    if (!row || !panel || !button) {
+      return;
+    }
+
+    const shouldOpen = panel.hidden;
+    closeNodeMenus(id);
+    panel.hidden = !shouldOpen;
+    button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    state.activeNodeId = id;
+    renderActiveOnly();
+
+    if (shouldOpen) {
+      panel.querySelector('.node-menu-item')?.focus();
+    }
   }
 
   function focusNode(id) {
@@ -511,6 +575,9 @@
   function setMenuOpen(isOpen) {
     menuPanel.hidden = !isOpen;
     menuToggleButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    if (isOpen) {
+      closeNodeMenus();
+    }
   }
 
   function toggleMenu() {
@@ -687,6 +754,10 @@
   exportCloseButton.addEventListener('click', closeExportPanel);
 
   document.addEventListener('click', (event) => {
+    if (!event.target.closest('.node-actions')) {
+      closeNodeMenus();
+    }
+
     if (menuPanel.hidden || event.target.closest('.topbar-menu')) {
       return;
     }
@@ -694,11 +765,21 @@
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || menuPanel.hidden) {
+    if (event.key !== 'Escape') {
       return;
     }
-    setMenuOpen(false);
-    menuToggleButton.focus();
+
+    const openNodeMenuButton = outlineEl.querySelector('.node-menu-panel:not([hidden])')?.closest('.node')?.querySelector('.node-menu-button');
+    if (openNodeMenuButton) {
+      closeNodeMenus();
+      openNodeMenuButton.focus();
+      return;
+    }
+
+    if (!menuPanel.hidden) {
+      setMenuOpen(false);
+      menuToggleButton.focus();
+    }
   });
 
   loadTree();
