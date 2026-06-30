@@ -155,12 +155,6 @@ textarea:focus-visible,
   color: #8a5c00;
 }
 
-.asset-version {
-  margin: 2px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-}
-
 .topbar-actions {
   display: flex;
   align-items: center;
@@ -333,6 +327,10 @@ textarea:focus-visible,
   border-radius: 8px;
   background: var(--panel);
   box-shadow: 0 12px 24px rgba(32, 37, 31, 0.14);
+}
+
+.node-menu-panel[hidden] {
+  display: none;
 }
 
 .node-menu-item {

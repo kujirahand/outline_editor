@@ -177,11 +177,10 @@ def test_local_storage_restores_last_file(page, base_url: str) -> None:
         raise TestFailure("Stored active file id was not restored from localStorage.")
 
 
-def test_asset_versions_are_visible(page, base_url: str) -> None:
+def test_asset_urls_include_update_timestamps(page, base_url: str) -> None:
     login(page, base_url)
     script_src = page.locator('script[src*="assets/app.js"]').get_attribute("src")
     style_href = page.locator('link[href*="assets/style.css"]').get_attribute("href")
-    version_text = page.locator(".asset-version").inner_text()
 
     if not script_src or not re.search(r"assets/app\.js\?v=\d{14}$", script_src):
         raise TestFailure(f"JavaScript asset URL should include an update timestamp, got {script_src!r}.")
@@ -189,12 +188,15 @@ def test_asset_versions_are_visible(page, base_url: str) -> None:
     if not style_href or not re.search(r"assets/style\.css\?v=\d{14}$", style_href):
         raise TestFailure(f"CSS asset URL should include an update timestamp, got {style_href!r}.")
 
-    if not re.search(r"JS \d{14} / CSS \d{14}", version_text):
-        raise TestFailure(f"Asset update timestamps should be visible, got {version_text!r}.")
-
 
 def test_node_context_menu_shows_indent_buttons(page, base_url: str) -> None:
     login(page, base_url)
+    visible_items_before = page.locator(".node-menu-panel .node-menu-item").evaluate_all(
+        "(items) => items.filter((item) => item.offsetParent !== null).map((item) => item.textContent)"
+    )
+    if visible_items_before:
+        raise TestFailure(f"Node context menu items should be hidden before opening, got {visible_items_before}.")
+
     page.locator(".node-menu-button").first.click()
 
     if page.locator(".node-actions .icon-button:not(.node-menu-button)").count() != 0:
@@ -206,6 +208,12 @@ def test_node_context_menu_shows_indent_buttons(page, base_url: str) -> None:
     )
     if labels != ["←", "→"]:
         raise TestFailure(f"Node context menu labels should be left and right arrows, got {labels}.")
+
+    visible_items_after = first_menu.locator(".node-menu-item").evaluate_all(
+        "(items) => items.filter((item) => item.offsetParent !== null).map((item) => item.textContent)"
+    )
+    if visible_items_after != ["←", "→"]:
+        raise TestFailure(f"Node context menu items should be visible after opening, got {visible_items_after}.")
 
 
 def run_app_tests() -> None:
@@ -238,7 +246,7 @@ def run_app_tests() -> None:
                 page = browser.new_page()
                 test_local_storage_restores_last_file(page, base_url)
                 page = browser.new_page()
-                test_asset_versions_are_visible(page, base_url)
+                test_asset_urls_include_update_timestamps(page, base_url)
                 page = browser.new_page()
                 test_node_context_menu_shows_indent_buttons(page, base_url)
             finally:

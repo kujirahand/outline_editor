@@ -3,7 +3,6 @@
     <div>
       <h1>Outline Editor</h1>
       <p id="save-status" class="save-status">読み込み中</p>
-      <p class="asset-version">JS <?= h(asset_updated_at('assets/app.js')) ?> / CSS <?= h(asset_updated_at('assets/style.css')) ?></p>
     </div>
     <div class="topbar-actions">
       <span class="user-name"><?= h((string)($user['display_name'] ?: $user['login_id'])) ?></span>
