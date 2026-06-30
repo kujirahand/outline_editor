@@ -320,7 +320,8 @@ textarea:focus-visible,
   top: calc(100% + 4px);
   right: 0;
   z-index: 20;
-  min-width: 120px;
+  display: flex;
+  gap: 3px;
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -329,11 +330,14 @@ textarea:focus-visible,
 }
 
 .node-menu-item {
-  width: 100%;
-  min-height: 34px;
-  padding: 6px 10px;
-  text-align: left;
-  white-space: nowrap;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
   border-color: transparent;
   background: transparent;
 }

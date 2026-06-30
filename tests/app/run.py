@@ -184,7 +184,14 @@ def test_node_context_menu_adds_sibling(page, base_url: str) -> None:
     if page.locator(".node-actions .icon-button:not(.node-menu-button)").count() != 0:
         raise TestFailure("Node actions should be collapsed into a single menu button.")
 
-    page.get_by_role("menuitem", name="下に追加").click()
+    first_menu = page.locator(".node-menu-panel").first
+    labels = first_menu.locator(".node-menu-item").evaluate_all(
+        "(items) => items.map((item) => item.textContent)"
+    )
+    if labels != ["→", "←", "↓"]:
+        raise TestFailure(f"Node context menu labels should be arrows, got {labels}.")
+
+    first_menu.get_by_role("menuitem", name="下に追加").click()
     page.wait_for_function(
         "(count) => document.querySelectorAll('.node-text').length === count + 1",
         arg=before,

@@ -231,9 +231,9 @@
     menu.hidden = true;
 
     menu.append(
-      makeNodeMenuButton('下に追加', () => createNodeAfter(id)),
-      makeNodeMenuButton('子にする', () => indentNode(id)),
-      makeNodeMenuButton('親に戻す', () => outdentNode(id))
+      makeNodeMenuButton('→', '子にする', () => indentNode(id)),
+      makeNodeMenuButton('←', '親に戻す', () => outdentNode(id)),
+      makeNodeMenuButton('↓', '下に追加', () => createNodeAfter(id))
     );
 
     actions.append(menuButton, menu);
@@ -258,11 +258,13 @@
     return button;
   }
 
-  function makeNodeMenuButton(label, handler) {
+  function makeNodeMenuButton(label, title, handler) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'node-menu-item';
     button.textContent = label;
+    button.title = title;
+    button.setAttribute('aria-label', title);
     button.setAttribute('role', 'menuitem');
     button.addEventListener('click', async (event) => {
       event.stopPropagation();
