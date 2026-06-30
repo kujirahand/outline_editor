@@ -34,4 +34,4 @@
     <textarea id="export-text" class="export-text" readonly aria-label="Markdown export"></textarea>
   </div>
 </div>
-<script src="assets/app.js" defer></script>
+<script src="<?= h(asset_url('assets/app.js')) ?>" defer></script>

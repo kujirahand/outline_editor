@@ -7,6 +7,13 @@ function h(string $value): string
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+function asset_url(string $path): string
+{
+    $fullPath = __DIR__ . '/../../' . ltrim($path, '/');
+    $version = is_file($fullPath) ? (string)filemtime($fullPath) : '1';
+    return $path . '?v=' . rawurlencode($version);
+}
+
 function render_template(string $template, array $params = []): string
 {
     $path = __DIR__ . '/../../templates/' . $template;
