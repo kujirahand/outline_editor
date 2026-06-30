@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-const OUTLINE_DATA_DIR = __DIR__ . '/../data';
+const OUTLINE_DATA_DIR = __DIR__ . '/../../data';
 
 function now_text(): string
 {
@@ -238,4 +238,3 @@ function fetch_nodes(PDO $pdo): array
         ];
     }, $rows);
 }
-

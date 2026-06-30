@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../lib/api.php';
+require_once __DIR__ . '/lib/api.php';
 
 $user = require_api_user();
 $input = require_json_post();

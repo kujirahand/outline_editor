@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/lib/auth.php';
-require_once __DIR__ . '/lib/template.php';
+require_once __DIR__ . '/api/lib/auth.php';
+require_once __DIR__ . '/api/lib/template.php';
 
 $error = '';
 
@@ -36,4 +36,3 @@ echo render_page($user ? 'outline.php' : 'login.php', [
     'error' => $error,
     'csrfToken' => csrf_token(),
 ]);
-

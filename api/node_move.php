@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../lib/api.php';
+require_once __DIR__ . '/lib/api.php';
 
 function sibling_ids(PDO $pdo, ?int $parentId, int $excludeId): array
 {
@@ -78,4 +78,3 @@ json_response([
     'node' => get_node($pdo, $id),
     'nodes' => fetch_nodes($pdo),
 ]);
-

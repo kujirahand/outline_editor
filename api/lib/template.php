@@ -9,7 +9,7 @@ function h(string $value): string
 
 function render_template(string $template, array $params = []): string
 {
-    $path = __DIR__ . '/../templates/' . $template;
+    $path = __DIR__ . '/../../templates/' . $template;
     if (!is_file($path)) {
         throw new RuntimeException('Template not found: ' . $template);
     }
@@ -26,4 +26,3 @@ function render_page(string $template, array $params = []): string
     $content = render_template($template, $params);
     return render_template('layout.php', array_merge($params, ['content' => $content]));
 }
-
