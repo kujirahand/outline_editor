@@ -7,6 +7,8 @@
   const exportEl = document.getElementById('export-text');
   const addRootButton = document.getElementById('add-root-button');
   const exportButton = document.getElementById('export-button');
+  const menuToggleButton = document.getElementById('menu-toggle-button');
+  const menuPanel = document.getElementById('topbar-menu-panel');
 
   const state = {
     nodes: new Map(),
@@ -390,6 +392,15 @@
     exportEl.select();
   }
 
+  function setMenuOpen(isOpen) {
+    menuPanel.hidden = !isOpen;
+    menuToggleButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }
+
+  function toggleMenu() {
+    setMenuOpen(menuPanel.hidden);
+  }
+
   outlineEl.addEventListener('focusin', (event) => {
     const text = event.target.closest('.node-text');
     if (!text) {
@@ -496,8 +507,30 @@
     await createNode(null, state.rootIds.length, '');
   });
 
-  exportButton.addEventListener('click', exportMarkdown);
+  menuToggleButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    toggleMenu();
+  });
+
+  exportButton.addEventListener('click', () => {
+    exportMarkdown();
+    setMenuOpen(false);
+  });
+
+  document.addEventListener('click', (event) => {
+    if (menuPanel.hidden || event.target.closest('.topbar-menu')) {
+      return;
+    }
+    setMenuOpen(false);
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || menuPanel.hidden) {
+      return;
+    }
+    setMenuOpen(false);
+    menuToggleButton.focus();
+  });
 
   loadTree();
 })();
-

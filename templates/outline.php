@@ -11,13 +11,18 @@
         <input type="hidden" name="csrf_token" value="<?= h((string)$csrfToken) ?>">
         <button class="secondary-button" type="submit">ログアウト</button>
       </form>
+      <div class="topbar-menu">
+        <button id="menu-toggle-button" class="menu-toggle-button" type="button" aria-label="メニュー" aria-expanded="false" aria-controls="topbar-menu-panel">☰</button>
+        <div id="topbar-menu-panel" class="topbar-menu-panel" hidden>
+          <button id="export-button" class="menu-item-button" type="button">Markdown</button>
+        </div>
+      </div>
     </div>
   </header>
 
   <main class="editor-shell">
     <div class="toolbar" aria-label="編集ツール">
       <button id="add-root-button" type="button">ルート追加</button>
-      <button id="export-button" type="button">Markdown</button>
     </div>
     <section id="outline" class="outline" aria-label="アウトライン"></section>
   </main>
@@ -25,4 +30,3 @@
   <textarea id="export-text" class="export-text" readonly aria-label="Markdown export"></textarea>
 </div>
 <script src="assets/app.js" defer></script>
-
