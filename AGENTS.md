@@ -99,6 +99,7 @@ CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_dir TEXT NOT NULL UNIQUE,
   login_id TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL DEFAULT '',
   password_hash TEXT NOT NULL,
   display_name TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
@@ -392,7 +393,15 @@ $input = json_decode(file_get_contents('php://input'), true);
 - ログアウトできる
 - ログインしていない場合、アウトライン画面と書き込み API を使わせない
 
-ユーザー追加方法は最初は簡素で構いません。例えば、管理用スクリプトや初期セットアップ処理でユーザーを作成してもよいです。ただし、アウトライン編集画面は必ずログイン後に表示します。
+ユーザー登録は、最初は登録コードを持っている人だけが使える仕組みにします。登録コードを入力したユーザーに対して、メールで4桁の認証番号を送信します。ユーザーは1時間以内に、その4桁番号を入力できた場合だけ登録を完了できます。
+
+登録コードは、初期段階では管理者が事前に用意した招待コードとして扱います。コードはDBにハッシュ化して保存し、平文の登録コードを保存しません。環境変数などから初期コードを投入できるようにしても構いません。
+
+メール認証番号は4桁の数字とし、DBには `password_hash()` などでハッシュ化して保存します。認証番号は1時間で失効させ、使用済みの番号は再利用できないようにします。メール送信に失敗した場合は登録を進めません。
+
+登録完了時には、メールアドレス、`login_id`、パスワード、表示名を保存します。パスワードは必ず `password_hash()` で保存し、検証には `password_verify()` を使います。登録後はログイン済みセッションを作っても構いません。
+
+初期管理ユーザーは、開発確認用として自動作成しても構いません。ただし、一般ユーザーの追加は登録コードとメール認証を通すことを優先します。
 
 セッション開始時は `session_start()` を使います。ログイン成功時には `session_regenerate_id(true)` を呼びます。
 

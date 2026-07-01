@@ -27,6 +27,10 @@ if (!is_valid_plugin_name($name)) {
     json_response(['ok' => false, 'error' => 'Invalid plugin name'], 400);
 }
 
+if (!is_menu_plugin_enabled($user, $name)) {
+    json_response(['ok' => false, 'error' => 'Plugin is disabled'], 403);
+}
+
 $params = $input;
 unset($params['name'], $params['type']);
 $params['user'] = $user;

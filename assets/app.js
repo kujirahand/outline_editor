@@ -17,6 +17,11 @@
   const exportButton = document.getElementById('export-button');
   const menuToggleButton = document.getElementById('menu-toggle-button');
   const menuPanel = document.getElementById('topbar-menu-panel');
+  const settingsOpenButton = document.getElementById('settings-open-button');
+  const settingsPanel = document.getElementById('settings-panel');
+  const settingsCloseButton = document.getElementById('settings-close-button');
+  const settingsForm = document.getElementById('settings-form');
+  const settingsStatus = document.getElementById('settings-status');
   const pluginPopupPanel = document.getElementById('plugin-popup-panel');
   const pluginPopupTitle = document.getElementById('plugin-popup-title');
   const pluginPopupContent = document.getElementById('plugin-popup-content');
@@ -33,6 +38,7 @@
     savingTimers: new Map(),
     pointer: null,
     filePickerLastFocus: null,
+    settingsLastFocus: null,
     pluginPopupLastFocus: null,
     lastTextSelection: null,
     pluginLastResult: null
@@ -829,7 +835,7 @@
   }
 
   function syncModalLock() {
-    document.body.classList.toggle('has-modal', !filePickerPanel.hidden || !pluginPopupPanel.hidden);
+    document.body.classList.toggle('has-modal', !filePickerPanel.hidden || !settingsPanel.hidden || !pluginPopupPanel.hidden);
   }
 
   function setFilePickerOpen(isOpen) {
@@ -853,6 +859,74 @@
       menuToggleButton.focus();
     }
     state.filePickerLastFocus = null;
+  }
+
+  function setSettingsStatus(text, mode) {
+    settingsStatus.textContent = text || '';
+    settingsStatus.dataset.mode = mode || '';
+  }
+
+  function setSettingsOpen(isOpen) {
+    settingsPanel.hidden = !isOpen;
+    syncModalLock();
+
+    if (isOpen) {
+      state.settingsLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setMenuOpen(false);
+      closeNodeMenus();
+      setSettingsStatus('', '');
+      settingsPanel.querySelector('.settings-plugin-toggle, #settings-close-button')?.focus();
+      return;
+    }
+
+    if (state.settingsLastFocus && state.settingsLastFocus.offsetParent !== null) {
+      state.settingsLastFocus.focus();
+    } else {
+      menuToggleButton.focus();
+    }
+    state.settingsLastFocus = null;
+  }
+
+  function openSettings() {
+    setSettingsOpen(true);
+  }
+
+  function closeSettings() {
+    setSettingsOpen(false);
+  }
+
+  function applyMenuPluginVisibility(menuPlugins) {
+    for (const plugin of menuPlugins) {
+      const name = String(plugin.name || '');
+      const button = [...menuPanel.querySelectorAll('.plugin-menu-button')]
+        .find((item) => item.dataset.pluginMenuName === name);
+      if (button) {
+        button.hidden = !plugin.enabled;
+      }
+
+      const toggle = [...settingsPanel.querySelectorAll('.settings-plugin-toggle')]
+        .find((item) => item.dataset.pluginName === name);
+      if (toggle) {
+        toggle.checked = Boolean(plugin.enabled);
+      }
+    }
+  }
+
+  async function saveSettings() {
+    const menuPlugins = {};
+    for (const toggle of settingsPanel.querySelectorAll('.settings-plugin-toggle')) {
+      menuPlugins[toggle.dataset.pluginName || ''] = toggle.checked;
+    }
+
+    try {
+      setSettingsStatus('保存中', 'saving');
+      const data = await apiPost('api/settings.php', { menu_plugins: menuPlugins });
+      applyMenuPluginVisibility(data.menu_plugins || []);
+      setSettingsStatus('保存済み', 'saved');
+    } catch (error) {
+      setSettingsStatus('保存失敗', 'error');
+      console.error(error);
+    }
   }
 
   function openPluginPopup(button) {
@@ -1058,6 +1132,15 @@
 
   fileCreateButton.addEventListener('click', createFile);
 
+  settingsOpenButton.addEventListener('click', openSettings);
+
+  settingsCloseButton.addEventListener('click', closeSettings);
+
+  settingsForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await saveSettings();
+  });
+
   filePickerCloseButton.addEventListener('click', closeFilePicker);
 
   filePickerPanel.addEventListener('click', async (event) => {
@@ -1099,6 +1182,12 @@
   pluginPopupPanel.addEventListener('click', (event) => {
     if (event.target === pluginPopupPanel) {
       closePluginPopup();
+    }
+  });
+
+  settingsPanel.addEventListener('click', (event) => {
+    if (event.target === settingsPanel) {
+      closeSettings();
     }
   });
 
@@ -1195,6 +1284,11 @@
 
     if (!filePickerPanel.hidden) {
       closeFilePicker();
+      return;
+    }
+
+    if (!settingsPanel.hidden) {
+      closeSettings();
       return;
     }
 

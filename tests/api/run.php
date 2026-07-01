@@ -176,6 +176,19 @@ function has_node_text(array $nodes, string $text): bool
     return false;
 }
 
+/**
+ * @param array<int, array<string, mixed>> $plugins
+ */
+function find_menu_plugin(array $plugins, string $name): array
+{
+    foreach ($plugins as $plugin) {
+        if (($plugin['name'] ?? null) === $name) {
+            return $plugin;
+        }
+    }
+    throw new TestFailure("Menu plugin was not found: $name");
+}
+
 function remove_tree(string $path): void
 {
     if (!is_dir($path)) {
@@ -240,9 +253,10 @@ function test_menu_plugin_loader(): void
 }
 
 /**
+ * @param array<string, string> $extraEnv
  * @return resource
  */
-function start_server(string $dataDir, int $port)
+function start_server(string $dataDir, int $port, array $extraEnv = [])
 {
     $root = dirname(__DIR__, 2);
     $descriptorSpec = [
@@ -256,7 +270,7 @@ function start_server(string $dataDir, int $port)
         $descriptorSpec,
         $pipes,
         $root,
-        ['OUTLINE_DATA_DIR' => $dataDir],
+        array_merge(['OUTLINE_DATA_DIR' => $dataDir], $extraEnv),
     );
     if (!is_resource($process)) {
         throw new TestFailure('Cannot start PHP test server.');
@@ -285,6 +299,20 @@ function start_server(string $dataDir, int $port)
     throw new TestFailure('PHP test server did not start.');
 }
 
+/**
+ * @param array<string, string> $fields
+ * @return array{status:int, headers:array<int, string>, body:string, json:?array}
+ */
+function post_form(HttpClient $client, array $fields): array
+{
+    return $client->request(
+        'POST',
+        '/',
+        http_build_query($fields),
+        ['Content-Type: application/x-www-form-urlencoded'],
+    );
+}
+
 function login(HttpClient $client): string
 {
     $loginPage = $client->request('GET', '/');
@@ -306,13 +334,55 @@ function login(HttpClient $client): string
     return extract_csrf($outline['body']);
 }
 
+function test_registration_flow(HttpClient $client, string $mailLog): string
+{
+    $loginPage = $client->request('GET', '/');
+    assert_same(200, $loginPage['status'], 'Login page should load before registration.');
+    $csrf = extract_csrf($loginPage['body']);
+
+    $request = post_form($client, [
+        'csrf_token' => $csrf,
+        'action' => 'request_register',
+        'registration_code' => 'invite-test',
+        'email' => 'new-user@example.com',
+    ]);
+    assert_same(200, $request['status'], 'Registration code request should render the login page.');
+    assert_true(str_contains($request['body'], '認証番号をメールで送信しました'), 'Registration request notice was not rendered.');
+
+    $mailBody = is_file($mailLog) ? (string)file_get_contents($mailLog) : '';
+    if (!preg_match('/code=(\d{4})/', $mailBody, $matches)) {
+        throw new TestFailure('Registration email code was not written to the mail log.');
+    }
+
+    $csrf = extract_csrf($request['body']);
+    $complete = post_form($client, [
+        'csrf_token' => $csrf,
+        'action' => 'complete_register',
+        'email' => 'new-user@example.com',
+        'email_code' => $matches[1],
+        'login_id' => 'new-user',
+        'display_name' => 'New User',
+        'password' => 'registered-pass',
+    ]);
+    assert_same(302, $complete['status'], 'Registration completion should redirect after success.');
+
+    $outline = $client->request('GET', '/');
+    assert_same(200, $outline['status'], 'Outline page should load after registration.');
+    assert_true(str_contains($outline['body'], 'New User'), 'Registered user should be logged in.');
+    return extract_csrf($outline['body']);
+}
+
 function run_api_tests(): void
 {
     test_menu_plugin_loader();
 
     $dataDir = sys_get_temp_dir() . '/outline-api-test-' . getmypid() . '-' . bin2hex(random_bytes(4));
+    $mailLog = $dataDir . '/mail.log';
     $port = free_port();
-    $process = start_server($dataDir, $port);
+    $process = start_server($dataDir, $port, [
+        'OUTLINE_REGISTRATION_CODES' => 'invite-test',
+        'OUTLINE_MAIL_LOG' => $mailLog,
+    ]);
     $client = new HttpClient('http://127.0.0.1:' . $port);
 
     try {
@@ -320,7 +390,7 @@ function run_api_tests(): void
         assert_same(false, $unauthorized['ok'], 'Tree API should reject anonymous users.');
         assert_same('Login required', $unauthorized['error'], 'Anonymous tree API error mismatch.');
 
-        $csrfToken = login($client);
+        $csrfToken = test_registration_flow($client, $mailLog);
 
         $tree = expect_json($client->request('GET', '/api/tree.php'), 200);
         assert_same(true, $tree['ok'], 'Tree API should succeed after login.');
@@ -428,6 +498,24 @@ function run_api_tests(): void
         foreach ($dice['result']['rolls'] as $roll) {
             assert_true(is_int($roll) && $roll >= 1 && $roll <= 6, 'Dice roll should be in range.');
         }
+
+        $settings = expect_json($client->request('GET', '/api/settings.php'), 200);
+        assert_same(true, $settings['ok'], 'Settings API should succeed.');
+        assert_true(count($settings['menu_plugins']) >= 1, 'Settings API should return menu plugins.');
+        assert_same(true, find_menu_plugin($settings['menu_plugins'], 'dice')['enabled'], 'Dice plugin should start enabled.');
+
+        $disabledSettings = expect_json(api_post($client, '/api/settings.php', [
+            'menu_plugins' => ['dice' => false],
+        ], $csrfToken), 200);
+        assert_same(false, find_menu_plugin($disabledSettings['menu_plugins'], 'dice')['enabled'], 'Dice plugin should be disabled.');
+
+        $disabledDice = expect_json($client->request('GET', '/api/plugin.php?name=dice&type=menu&count=1&sides=6'), 403);
+        assert_same('Plugin is disabled', $disabledDice['error'], 'Disabled plugin error mismatch.');
+
+        $enabledSettings = expect_json(api_post($client, '/api/settings.php', [
+            'menu_plugins' => ['dice' => true],
+        ], $csrfToken), 200);
+        assert_same(true, find_menu_plugin($enabledSettings['menu_plugins'], 'dice')['enabled'], 'Dice plugin should be re-enabled.');
     } finally {
         proc_terminate($process);
         proc_close($process);

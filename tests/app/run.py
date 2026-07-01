@@ -327,6 +327,45 @@ def test_dice_plugin_runs_from_menu_popup(page, base_url: str) -> None:
         raise TestFailure(f"Dice total should be inserted at the saved cursor position, got {text!r}.")
 
 
+def test_settings_toggle_menu_plugin(page, base_url: str) -> None:
+    login(page, base_url)
+
+    page.locator("#menu-toggle-button").click()
+    dice_button = page.locator('.plugin-menu-button[data-plugin-menu-name="dice"]')
+    if dice_button.evaluate("(button) => button.hidden"):
+        raise TestFailure("Dice plugin menu button should start visible.")
+
+    page.locator("#settings-open-button").click()
+    page.wait_for_selector("#settings-panel:not([hidden])")
+    dice_toggle = page.locator('.settings-plugin-toggle[data-plugin-name="dice"]')
+    if not dice_toggle.is_checked():
+        raise TestFailure("Dice plugin setting should start enabled.")
+
+    dice_toggle.uncheck()
+    page.locator("#settings-save-button").click()
+    page.wait_for_function("document.getElementById('settings-status').textContent === '保存済み'")
+    if not dice_button.evaluate("(button) => button.hidden"):
+        raise TestFailure("Disabled plugin should be hidden from the hamburger menu.")
+
+    disabled_result = page.evaluate(
+        """async () => {
+            const response = await fetch("api/plugin.php?name=dice&type=menu&count=1&sides=6", {
+                credentials: "same-origin"
+            });
+            const data = await response.json();
+            return { status: response.status, data };
+        }"""
+    )
+    if disabled_result["status"] != 403 or disabled_result["data"].get("error") != "Plugin is disabled":
+        raise TestFailure(f"Disabled plugin API should be rejected, got {disabled_result!r}.")
+
+    dice_toggle.check()
+    page.locator("#settings-save-button").click()
+    page.wait_for_function("document.getElementById('settings-status').textContent === '保存済み'")
+    if dice_button.evaluate("(button) => button.hidden"):
+        raise TestFailure("Re-enabled plugin should be shown in the hamburger menu.")
+
+
 def run_app_tests() -> None:
     try:
         from playwright.sync_api import sync_playwright
@@ -364,6 +403,8 @@ def run_app_tests() -> None:
                 test_node_context_menu_shows_indent_buttons(page, base_url)
                 page = browser.new_page()
                 test_dice_plugin_runs_from_menu_popup(page, base_url)
+                page = browser.new_page()
+                test_settings_toggle_menu_plugin(page, base_url)
             finally:
                 browser.close()
     finally:
