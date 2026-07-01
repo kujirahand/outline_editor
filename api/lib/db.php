@@ -568,11 +568,8 @@ function is_menu_plugin_enabled(array $user, string $pluginName): bool
 function set_menu_plugin_enabled(array $user, string $pluginName, bool $enabled): void
 {
     $stmt = users_db()->prepare(
-        'INSERT INTO menu_plugin_settings (user_id, plugin_name, enabled, updated_at)
-         VALUES (:user_id, :plugin_name, :enabled, :updated_at)
-         ON CONFLICT(user_id, plugin_name) DO UPDATE SET
-            enabled = excluded.enabled,
-            updated_at = excluded.updated_at'
+        'REPLACE INTO menu_plugin_settings (user_id, plugin_name, enabled, updated_at)
+         VALUES (:user_id, :plugin_name, :enabled, :updated_at)'
     );
     $stmt->execute([
         ':user_id' => user_id($user),
