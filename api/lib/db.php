@@ -44,15 +44,16 @@ function ensure_users_schema(PDO $pdo): void
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_dir TEXT NOT NULL UNIQUE,
             login_id TEXT NOT NULL UNIQUE,
-            email TEXT NOT NULL DEFAULT "",
+            email TEXT NULL DEFAULT NULL,
             password_hash TEXT NOT NULL,
             display_name TEXT NOT NULL DEFAULT "",
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )'
     );
-    ensure_column($pdo, 'users', 'email', 'TEXT NOT NULL DEFAULT ""');
-    $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email) WHERE email <> ""');
+    ensure_column($pdo, 'users', 'email', 'TEXT NULL DEFAULT NULL');
+    $pdo->exec('UPDATE users SET email = NULL WHERE email = ""');
+    $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email)');
     $pdo->exec(
         'CREATE TABLE IF NOT EXISTS outline_files (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -200,7 +201,7 @@ function find_user_by_login_id(string $loginId): ?array
 
 function find_user_by_email(string $email): ?array
 {
-    $stmt = users_db()->prepare('SELECT * FROM users WHERE email = :email AND email <> ""');
+    $stmt = users_db()->prepare('SELECT * FROM users WHERE email = :email AND email IS NOT NULL');
     $stmt->execute([':email' => normalize_email($email)]);
     $user = $stmt->fetch();
     return $user ?: null;
