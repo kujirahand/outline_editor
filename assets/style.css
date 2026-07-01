@@ -63,11 +63,36 @@ textarea:focus-visible,
 }
 
 .auth-grid {
-  width: min(900px, 100%);
+  width: min(440px, 100%);
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 18px;
   align-items: start;
+}
+
+.auth-grid[data-active-panel="login"] .register-panel {
+  display: none;
+}
+
+.auth-grid[data-active-panel="register"] .login-panel:not(.register-panel) {
+  display: none;
+}
+
+.auth-toggle {
+  text-align: center;
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.auth-toggle a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-toggle a:hover {
+  text-decoration: underline;
 }
 
 .login-panel {

@@ -1,5 +1,8 @@
+<?php
+$activePanel = (!empty($registerError) || !empty($notice)) ? 'register' : 'login';
+?>
 <main class="login-shell">
-  <div class="auth-grid">
+  <div class="auth-grid" data-active-panel="<?= $activePanel ?>">
     <form class="login-panel" method="post" action="./">
       <input type="hidden" name="action" value="login">
       <input type="hidden" name="csrf_token" value="<?= h((string)$csrfToken) ?>">
@@ -22,6 +25,9 @@
 
       <button type="submit">ログイン</button>
       <p class="login-hint">初期ユーザー: admin / outline</p>
+      <div class="auth-toggle">
+        アカウントをお持ちでないですか？ <a href="#" id="to-register">ユーザー登録</a>
+      </div>
     </form>
 
     <section class="login-panel register-panel">
@@ -83,6 +89,31 @@
 
         <button type="submit">登録を完了</button>
       </form>
+      <div class="auth-toggle">
+        すでにアカウントをお持ちですか？ <a href="#" id="to-login">ログイン</a>
+      </div>
     </section>
   </div>
 </main>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const grid = document.querySelector('.auth-grid');
+  const toRegister = document.getElementById('to-register');
+  const toLogin = document.getElementById('to-login');
+
+  if (toRegister && grid) {
+    toRegister.addEventListener('click', (e) => {
+      e.preventDefault();
+      grid.setAttribute('data-active-panel', 'register');
+    });
+  }
+
+  if (toLogin && grid) {
+    toLogin.addEventListener('click', (e) => {
+      e.preventDefault();
+      grid.setAttribute('data-active-panel', 'login');
+    });
+  }
+});
+</script>

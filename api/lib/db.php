@@ -52,7 +52,56 @@ function ensure_users_schema(PDO $pdo): void
         )'
     );
     ensure_column($pdo, 'users', 'email', 'TEXT NULL DEFAULT NULL');
-    $pdo->exec('UPDATE users SET email = NULL WHERE email = ""');
+
+    // email カラムに NOT NULL 制約がある場合はマイグレーションを実行する
+    $stmt = $pdo->query("PRAGMA table_info(users)");
+    $emailColumn = null;
+    foreach ($stmt->fetchAll() as $row) {
+        if (($row['name'] ?? '') === 'email') {
+            $emailColumn = $row;
+            break;
+        }
+    }
+
+    if ($emailColumn && (int)($emailColumn['notnull'] ?? 0) === 1) {
+        $pdo->beginTransaction();
+        try {
+            $pdo->exec('PRAGMA foreign_keys = OFF');
+            $pdo->exec('DROP INDEX IF EXISTS idx_users_email_unique');
+            $pdo->exec('ALTER TABLE users RENAME TO users_old');
+            $pdo->exec(
+                'CREATE TABLE users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_dir TEXT NOT NULL UNIQUE,
+                    login_id TEXT NOT NULL UNIQUE,
+                    email TEXT NULL DEFAULT NULL,
+                    password_hash TEXT NOT NULL,
+                    display_name TEXT NOT NULL DEFAULT "",
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )'
+            );
+            $pdo->exec(
+                'INSERT INTO users (id, user_dir, login_id, email, password_hash, display_name, created_at, updated_at)
+                 SELECT id, user_dir, login_id,
+                        CASE WHEN email = "" THEN NULL ELSE email END,
+                        password_hash, display_name, created_at, updated_at
+                 FROM users_old'
+            );
+            $pdo->exec('DROP TABLE users_old');
+            $pdo->exec('PRAGMA foreign_keys = ON');
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $pdo->exec('PRAGMA foreign_keys = ON');
+            throw $e;
+        }
+    } else {
+        $pdo->exec('UPDATE users SET email = NULL WHERE email = ""');
+    }
+
     $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email)');
     $pdo->exec(
         'CREATE TABLE IF NOT EXISTS outline_files (
