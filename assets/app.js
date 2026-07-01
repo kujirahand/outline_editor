@@ -358,11 +358,19 @@
     menu.setAttribute('role', 'menu');
     menu.hidden = true;
 
+    const deleteBtn = makeNodeMenuButton('×', '削除', () => {
+      if (confirm('本当に削除しますか？')) {
+        return deleteNode(id);
+      }
+    });
+    deleteBtn.classList.add('is-danger');
+
     menu.append(
       makeNodeMenuButton('←', '親に戻す', () => outdentNode(id)),
       makeNodeMenuButton('→', '子にする', () => indentNode(id)),
       makeNodeMenuButton('↑', '上に移動', () => moveUpNode(id)),
-      makeNodeMenuButton('↓', '下に移動', () => moveDownNode(id))
+      makeNodeMenuButton('↓', '下に移動', () => moveDownNode(id)),
+      deleteBtn
     );
 
     actions.append(menuButton, menu);

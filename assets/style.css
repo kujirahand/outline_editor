@@ -800,6 +800,15 @@ textarea:focus-visible,
   border-color: transparent;
 }
 
+.node-menu-item.is-danger {
+  color: var(--danger);
+}
+
+.node-menu-item.is-danger:hover,
+.node-menu-item.is-danger:focus-visible {
+  background: rgba(180, 35, 24, 0.1);
+}
+
 .export-panel {
   position: relative;
   width: min(980px, calc(100% - 24px));
