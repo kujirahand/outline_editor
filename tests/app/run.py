@@ -285,6 +285,24 @@ def test_node_context_menu_shows_indent_buttons(page, base_url: str) -> None:
 
 def test_dice_plugin_runs_from_menu_popup(page, base_url: str) -> None:
     login(page, base_url)
+    first = page.locator(".node-text").first
+    first.evaluate(
+        """(el) => {
+            el.textContent = "前後";
+            el.dispatchEvent(new InputEvent("input", {
+                bubbles: true,
+                inputType: "insertText",
+                data: "前後"
+            }));
+            const range = document.createRange();
+            range.setStart(el.firstChild, 1);
+            range.setEnd(el.firstChild, 1);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            document.dispatchEvent(new Event("selectionchange"));
+        }"""
+    )
     page.locator("#menu-toggle-button").click()
     page.get_by_role("button", name="サイコロ").click()
     page.wait_for_selector("#plugin-popup-panel:not([hidden])")
@@ -297,8 +315,16 @@ def test_dice_plugin_runs_from_menu_popup(page, base_url: str) -> None:
     page.wait_for_selector('#dice-result[data-mode="ok"]')
 
     result = page.locator("#dice-result").inner_text()
-    if not re.fullmatch(r"\d+ \+ \d+ = \d+", result):
+    match = re.fullmatch(r"\d+ \+ \d+ = (\d+)", result)
+    if not match:
         raise TestFailure(f"Dice plugin should show a roll label, got {result!r}.")
+    total = match.group(1)
+
+    page.get_by_role("button", name="合計を追加").click()
+    page.wait_for_function("document.getElementById('plugin-popup-panel').hidden")
+    text = first.inner_text()
+    if text != f"前{total}後":
+        raise TestFailure(f"Dice total should be inserted at the saved cursor position, got {text!r}.")
 
 
 def run_app_tests() -> None:

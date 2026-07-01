@@ -17,6 +17,7 @@ function get_menu_dice(array $args): array
               <input type="number" name="sides" min="2" max="100" value="6">
             </label>
             <button type="submit">振る</button>
+            <button class="plugin-secondary-button" type="button" data-plugin-insert-result="total" disabled>合計を追加</button>
           </form>
           <div id="dice-result" class="plugin-api-result" aria-live="polite"></div>
         ',

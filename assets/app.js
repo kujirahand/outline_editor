@@ -33,7 +33,9 @@
     savingTimers: new Map(),
     pointer: null,
     filePickerLastFocus: null,
-    pluginPopupLastFocus: null
+    pluginPopupLastFocus: null,
+    lastTextSelection: null,
+    pluginLastResult: null
   };
 
   function setStatus(text, mode) {
@@ -422,6 +424,105 @@
     selection.addRange(range);
   }
 
+  function textOffsetWithin(el, node, offset) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    try {
+      range.setEnd(node, offset);
+    } catch (error) {
+      return el.textContent.length;
+    }
+    return range.toString().length;
+  }
+
+  function nodeAndOffsetAtTextOffset(el, offset) {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let remaining = Math.max(0, offset);
+    let textNode = walker.nextNode();
+
+    while (textNode) {
+      const length = textNode.nodeValue.length;
+      if (remaining <= length) {
+        return { node: textNode, offset: remaining };
+      }
+      remaining -= length;
+      textNode = walker.nextNode();
+    }
+
+    if (!el.firstChild) {
+      el.append(document.createTextNode(''));
+    }
+    const lastNode = el.lastChild;
+    return {
+      node: lastNode,
+      offset: lastNode.nodeType === Node.TEXT_NODE ? lastNode.nodeValue.length : lastNode.childNodes.length
+    };
+  }
+
+  function setTextSelection(el, start, end) {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    const rangeStart = nodeAndOffsetAtTextOffset(el, start);
+    const rangeEnd = nodeAndOffsetAtTextOffset(el, end);
+    range.setStart(rangeStart.node, rangeStart.offset);
+    range.setEnd(rangeEnd.node, rangeEnd.offset);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  function rememberTextSelection() {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const anchor = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+      ? range.commonAncestorContainer
+      : range.commonAncestorContainer.parentElement;
+    const text = anchor?.closest?.('.node-text');
+    if (!text || !outlineEl.contains(text)) {
+      return;
+    }
+
+    state.activeNodeId = Number(text.dataset.id);
+    state.lastTextSelection = {
+      id: state.activeNodeId,
+      start: textOffsetWithin(text, range.startContainer, range.startOffset),
+      end: textOffsetWithin(text, range.endContainer, range.endOffset)
+    };
+  }
+
+  async function insertAtLastTextSelection(value) {
+    const textToInsert = String(value ?? '');
+    const savedSelection = state.lastTextSelection || {
+      id: state.activeNodeId,
+      start: null,
+      end: null
+    };
+    const id = savedSelection.id;
+    const node = state.nodes.get(id);
+    const textEl = outlineEl.querySelector(`.node-text[data-id="${id}"]`);
+    if (!node || !textEl || textToInsert === '') {
+      return;
+    }
+
+    const currentText = textEl.textContent || '';
+    const start = savedSelection.start === null ? currentText.length : Math.min(savedSelection.start, currentText.length);
+    const end = savedSelection.end === null ? start : Math.min(savedSelection.end, currentText.length);
+    const nextText = currentText.slice(0, start) + textToInsert + currentText.slice(end);
+    const nextOffset = start + textToInsert.length;
+
+    node.text = nextText;
+    state.activeNodeId = id;
+    textEl.textContent = nextText;
+    textEl.focus();
+    setTextSelection(textEl, nextOffset, nextOffset);
+    rememberTextSelection();
+    scheduleSaveText(id, nextText);
+    setStatus('未保存', 'dirty');
+  }
+
   function visibleIds() {
     const ids = [];
     const walk = (id) => {
@@ -764,6 +865,7 @@
     pluginPopupContent.replaceChildren(template.content.cloneNode(true));
     pluginPopupTitle.textContent = button.textContent || '';
     pluginPopupPanel.dataset.pluginName = name;
+    state.pluginLastResult = null;
     pluginPopupPanel.hidden = false;
     syncModalLock();
     state.pluginPopupLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : button;
@@ -772,11 +874,17 @@
     pluginPopupCloseButton.focus();
   }
 
-  function closePluginPopup() {
+  function closePluginPopup(restoreFocus = true) {
     pluginPopupPanel.hidden = true;
     delete pluginPopupPanel.dataset.pluginName;
     pluginPopupContent.replaceChildren();
+    state.pluginLastResult = null;
     syncModalLock();
+
+    if (!restoreFocus) {
+      state.pluginPopupLastFocus = null;
+      return;
+    }
 
     if (state.pluginPopupLastFocus && state.pluginPopupLastFocus.offsetParent !== null) {
       state.pluginPopupLastFocus.focus();
@@ -1021,6 +1129,10 @@
       if (!response.ok || !data.ok) {
         throw new Error(data.error || 'Plugin request failed');
       }
+      state.pluginLastResult = data.result || null;
+      for (const button of pluginPopupContent.querySelectorAll('[data-plugin-insert-result]')) {
+        button.disabled = !state.pluginLastResult;
+      }
       if (target) {
         target.textContent = data.result?.label || JSON.stringify(data.result, null, 2);
         target.dataset.mode = 'ok';
@@ -1033,6 +1145,24 @@
       console.error(error);
     }
   });
+
+  pluginPopupContent.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-plugin-insert-result]');
+    if (!button) {
+      return;
+    }
+
+    const key = button.dataset.pluginInsertResult || '';
+    const value = state.pluginLastResult?.[key];
+    if (value === undefined || value === null) {
+      return;
+    }
+
+    await insertAtLastTextSelection(value);
+    closePluginPopup(false);
+  });
+
+  document.addEventListener('selectionchange', rememberTextSelection);
 
   document.addEventListener('click', (event) => {
     if (!event.target.closest('.node-actions')) {

@@ -139,6 +139,16 @@ return [
 
 フォーム内の入力値はクエリパラメータとして渡されます。レスポンスの `result.label` があれば、`data-plugin-result` で指定した要素に表示されます。
 
+### API 結果をアウトラインへ挿入する
+
+プラグイン HTML 内のボタンに `data-plugin-insert-result="<key>"` を付けると、直近の API レスポンスの `result.<key>` を、プラグインを開く前に編集していたノードのカーソル位置へ挿入できます。
+
+```html
+<button type="button" data-plugin-insert-result="total" disabled>合計を追加</button>
+```
+
+API 実行前は `disabled` にしておくと、レスポンス受信後に自動で有効化されます。
+
 ## 表示の流れ
 
 1. ログイン済みユーザーがアウトライン画面を開く
@@ -200,3 +210,5 @@ GET /api/plugin.php?name=dice&type=menu&count=2&sides=6
 ```
 
 `exec_dice($params)` が `count` と `sides` を受け取り、出目、合計、表示用ラベルを返します。
+
+サイコロの画面では「合計を追加」ボタンで、`result.total` を現在のアウトラインのカーソル位置へ挿入できます。

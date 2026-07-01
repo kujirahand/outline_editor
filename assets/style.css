@@ -400,6 +400,17 @@ textarea:focus-visible,
   color: white;
 }
 
+.plugin-api-form .plugin-secondary-button {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.plugin-api-form button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .plugin-api-result {
   margin-top: 14px;
   min-height: 42px;
