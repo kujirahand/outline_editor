@@ -49,6 +49,29 @@
     statusEl.dataset.mode = mode || '';
   }
 
+  function updateNodeHeaderStyle(textEl, content) {
+    if (!textEl) return;
+    const isHeader = /^#+\s/.test(content || '');
+    textEl.classList.toggle('is-markdown-header', isHeader);
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function formatMarkdownInline(str) {
+    let escaped = escapeHtml(str);
+    escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong><span class="md-marker">**</span>$1<span class="md-marker">**</span></strong>');
+    escaped = escaped.replace(/`([^`]+)`/g, '<code><span class="md-marker">`</span>$1<span class="md-marker">`</span></code>');
+    return escaped;
+  }
+
   function readStoredActiveFileId() {
     try {
       const value = window.localStorage.getItem(activeFileStorageKey);
@@ -311,9 +334,10 @@
     text.dataset.id = String(id);
     text.contentEditable = 'true';
     text.spellcheck = false;
-    text.textContent = node.text;
+    text.innerHTML = formatMarkdownInline(node.text);
     text.setAttribute('role', 'textbox');
     text.setAttribute('aria-label', 'ノード本文');
+    updateNodeHeaderStyle(text, node.text);
 
     const actions = document.createElement('div');
     actions.className = 'node-actions';
@@ -521,7 +545,8 @@
 
     node.text = nextText;
     state.activeNodeId = id;
-    textEl.textContent = nextText;
+    textEl.innerHTML = formatMarkdownInline(nextText);
+    updateNodeHeaderStyle(textEl, nextText);
     textEl.focus();
     setTextSelection(textEl, nextOffset, nextOffset);
     rememberTextSelection();
@@ -1023,6 +1048,18 @@
     renderActiveOnly();
   });
 
+  outlineEl.addEventListener('focusout', (event) => {
+    const text = event.target.closest('.node-text');
+    if (!text) {
+      return;
+    }
+    const id = Number(text.dataset.id);
+    const node = state.nodes.get(id);
+    if (node) {
+      text.innerHTML = formatMarkdownInline(node.text);
+    }
+  });
+
   function renderActiveOnly() {
     for (const row of outlineEl.querySelectorAll('.node')) {
       row.classList.toggle('is-active', Number(row.dataset.id) === state.activeNodeId);
@@ -1035,7 +1072,9 @@
       return;
     }
 
-    scheduleSaveText(Number(text.dataset.id), text.textContent || '');
+    const content = text.textContent || '';
+    updateNodeHeaderStyle(text, content);
+    scheduleSaveText(Number(text.dataset.id), content);
   });
 
   outlineEl.addEventListener('click', (event) => {

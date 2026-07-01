@@ -7,6 +7,7 @@
   --muted: #697066;
   --accent: #176b5f;
   --accent-soft: #dceee8;
+  --accent-blue: #1a73e8;
   --danger: #b42318;
   --focus: #f2c14e;
 }
@@ -721,6 +722,29 @@ textarea:focus-visible,
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   user-select: text;
+}
+
+.node-text.is-markdown-header {
+  color: var(--accent-blue);
+  font-weight: 700;
+}
+
+.node-text strong {
+  font-weight: 700;
+}
+
+.node-text code {
+  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, monospace;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 0.9em;
+}
+
+.node-text .md-marker {
+  opacity: 0.35;
+  font-weight: normal;
 }
 
 .node-text:empty::before {
