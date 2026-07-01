@@ -13,6 +13,9 @@
           <button id="file-create-button" class="menu-item-button" type="button">新規ファイル</button>
           <button id="add-root-button" class="menu-item-button" type="button">ルート追加</button>
           <button id="export-button" class="menu-item-button" type="button">Markdown</button>
+          <?php foreach (($menuPlugins ?? []) as $menuPlugin): ?>
+            <button class="menu-item-button plugin-menu-button" type="button" data-plugin-menu-name="<?= h((string)$menuPlugin['name']) ?>"><?= h((string)$menuPlugin['label']) ?></button>
+          <?php endforeach; ?>
           <form class="menu-item-form" method="post" action="./">
             <input type="hidden" name="action" value="logout">
             <input type="hidden" name="csrf_token" value="<?= h((string)$csrfToken) ?>">
@@ -44,5 +47,19 @@
     <button id="export-close-button" class="export-close-button" type="button" aria-label="Markdown出力を閉じる">×</button>
     <textarea id="export-text" class="export-text" readonly aria-label="Markdown export"></textarea>
   </div>
+
+  <div id="plugin-popup-panel" class="plugin-popup-panel" role="dialog" aria-modal="true" aria-labelledby="plugin-popup-title" hidden>
+    <div class="plugin-popup-dialog">
+      <header class="plugin-popup-header">
+        <h2 id="plugin-popup-title"></h2>
+        <button id="plugin-popup-close-button" class="plugin-popup-close-button" type="button" aria-label="プラグイン画面を閉じる">×</button>
+      </header>
+      <div id="plugin-popup-content" class="plugin-popup-content"></div>
+    </div>
+  </div>
+
+  <?php foreach (($menuPlugins ?? []) as $menuPlugin): ?>
+    <template id="plugin-menu-template-<?= h((string)$menuPlugin['name']) ?>"><?= (string)$menuPlugin['html'] ?></template>
+  <?php endforeach; ?>
 </div>
 <script src="<?= h(asset_url('assets/app.js')) ?>" defer></script>

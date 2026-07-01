@@ -273,14 +273,32 @@ def test_node_context_menu_shows_indent_buttons(page, base_url: str) -> None:
     labels = first_menu.locator(".node-menu-item").evaluate_all(
         "(items) => items.map((item) => item.textContent)"
     )
-    if labels != ["←", "→"]:
-        raise TestFailure(f"Node context menu labels should be left and right arrows, got {labels}.")
+    if labels != ["←", "→", "↑", "↓"]:
+        raise TestFailure(f"Node context menu labels should be arrow controls, got {labels}.")
 
     visible_items_after = first_menu.locator(".node-menu-item").evaluate_all(
         "(items) => items.filter((item) => item.offsetParent !== null).map((item) => item.textContent)"
     )
-    if visible_items_after != ["←", "→"]:
+    if visible_items_after != ["←", "→", "↑", "↓"]:
         raise TestFailure(f"Node context menu items should be visible after opening, got {visible_items_after}.")
+
+
+def test_dice_plugin_runs_from_menu_popup(page, base_url: str) -> None:
+    login(page, base_url)
+    page.locator("#menu-toggle-button").click()
+    page.get_by_role("button", name="サイコロ").click()
+    page.wait_for_selector("#plugin-popup-panel:not([hidden])")
+
+    page.locator('#plugin-popup-content input[name="count"]').fill("2")
+    page.locator('#plugin-popup-content input[name="sides"]').fill("6")
+    page.locator('#plugin-popup-content form[data-plugin-api-form]').evaluate(
+        "(form) => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))"
+    )
+    page.wait_for_selector('#dice-result[data-mode="ok"]')
+
+    result = page.locator("#dice-result").inner_text()
+    if not re.fullmatch(r"\d+ \+ \d+ = \d+", result):
+        raise TestFailure(f"Dice plugin should show a roll label, got {result!r}.")
 
 
 def run_app_tests() -> None:
@@ -318,6 +336,8 @@ def run_app_tests() -> None:
                 test_asset_urls_include_update_timestamps(page, base_url)
                 page = browser.new_page()
                 test_node_context_menu_shows_indent_buttons(page, base_url)
+                page = browser.new_page()
+                test_dice_plugin_runs_from_menu_popup(page, base_url)
             finally:
                 browser.close()
     finally:

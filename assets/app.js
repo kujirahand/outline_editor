@@ -17,6 +17,10 @@
   const exportButton = document.getElementById('export-button');
   const menuToggleButton = document.getElementById('menu-toggle-button');
   const menuPanel = document.getElementById('topbar-menu-panel');
+  const pluginPopupPanel = document.getElementById('plugin-popup-panel');
+  const pluginPopupTitle = document.getElementById('plugin-popup-title');
+  const pluginPopupContent = document.getElementById('plugin-popup-content');
+  const pluginPopupCloseButton = document.getElementById('plugin-popup-close-button');
   const activeFileStorageKey = 'outlineEditor.activeFileId';
 
   const state = {
@@ -28,7 +32,8 @@
     activeNodeId: null,
     savingTimers: new Map(),
     pointer: null,
-    filePickerLastFocus: null
+    filePickerLastFocus: null,
+    pluginPopupLastFocus: null
   };
 
   function setStatus(text, mode) {
@@ -722,9 +727,13 @@
     setMenuOpen(menuPanel.hidden);
   }
 
+  function syncModalLock() {
+    document.body.classList.toggle('has-modal', !filePickerPanel.hidden || !pluginPopupPanel.hidden);
+  }
+
   function setFilePickerOpen(isOpen) {
     filePickerPanel.hidden = !isOpen;
-    document.body.classList.toggle('has-modal', isOpen);
+    syncModalLock();
 
     if (isOpen) {
       state.filePickerLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -743,6 +752,38 @@
       menuToggleButton.focus();
     }
     state.filePickerLastFocus = null;
+  }
+
+  function openPluginPopup(button) {
+    const name = button.dataset.pluginMenuName || '';
+    const template = document.getElementById(`plugin-menu-template-${name}`);
+    if (!(template instanceof HTMLTemplateElement)) {
+      return;
+    }
+
+    pluginPopupContent.replaceChildren(template.content.cloneNode(true));
+    pluginPopupTitle.textContent = button.textContent || '';
+    pluginPopupPanel.dataset.pluginName = name;
+    pluginPopupPanel.hidden = false;
+    syncModalLock();
+    state.pluginPopupLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : button;
+    setMenuOpen(false);
+    closeNodeMenus();
+    pluginPopupCloseButton.focus();
+  }
+
+  function closePluginPopup() {
+    pluginPopupPanel.hidden = true;
+    delete pluginPopupPanel.dataset.pluginName;
+    pluginPopupContent.replaceChildren();
+    syncModalLock();
+
+    if (state.pluginPopupLastFocus && state.pluginPopupLastFocus.offsetParent !== null) {
+      state.pluginPopupLastFocus.focus();
+    } else {
+      menuToggleButton.focus();
+    }
+    state.pluginPopupLastFocus = null;
   }
 
   function openFilePicker() {
@@ -930,12 +971,68 @@
     toggleMenu();
   });
 
+  menuPanel.addEventListener('click', (event) => {
+    const button = event.target.closest('.plugin-menu-button');
+    if (!button) {
+      return;
+    }
+    openPluginPopup(button);
+  });
+
   exportButton.addEventListener('click', () => {
     exportMarkdown();
     setMenuOpen(false);
   });
 
   exportCloseButton.addEventListener('click', closeExportPanel);
+
+  pluginPopupCloseButton.addEventListener('click', closePluginPopup);
+
+  pluginPopupPanel.addEventListener('click', (event) => {
+    if (event.target === pluginPopupPanel) {
+      closePluginPopup();
+    }
+  });
+
+  pluginPopupContent.addEventListener('submit', async (event) => {
+    const form = event.target.closest('form[data-plugin-api-form]');
+    if (!form) {
+      return;
+    }
+    event.preventDefault();
+
+    const pluginName = pluginPopupPanel.dataset.pluginName || '';
+    const targetSelector = form.dataset.pluginResult || '';
+    const target = targetSelector ? pluginPopupContent.querySelector(targetSelector) : null;
+    const params = new URLSearchParams(new FormData(form));
+    params.set('type', 'menu');
+    params.set('name', pluginName);
+
+    if (target) {
+      target.textContent = '実行中...';
+      target.dataset.mode = 'loading';
+    }
+
+    try {
+      const response = await fetch(`api/plugin.php?${params.toString()}`, {
+        credentials: 'same-origin'
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Plugin request failed');
+      }
+      if (target) {
+        target.textContent = data.result?.label || JSON.stringify(data.result, null, 2);
+        target.dataset.mode = 'ok';
+      }
+    } catch (error) {
+      if (target) {
+        target.textContent = error.message;
+        target.dataset.mode = 'error';
+      }
+      console.error(error);
+    }
+  });
 
   document.addEventListener('click', (event) => {
     if (!event.target.closest('.node-actions')) {
@@ -968,6 +1065,11 @@
 
     if (!filePickerPanel.hidden) {
       closeFilePicker();
+      return;
+    }
+
+    if (!pluginPopupPanel.hidden) {
+      closePluginPopup();
     }
   });
 

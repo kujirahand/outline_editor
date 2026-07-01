@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once dirname(__DIR__, 2) . '/api/lib/menu_plugin.php';
+
 final class TestFailure extends RuntimeException
 {
 }
@@ -214,6 +216,29 @@ function free_port(): int
     return (int)$matches[1];
 }
 
+function test_menu_plugin_loader(): void
+{
+    $dir = sys_get_temp_dir() . '/outline-menu-plugin-test-' . getmypid() . '-' . bin2hex(random_bytes(4));
+    mkdir($dir, 0777, true);
+    $name = 'demo_' . bin2hex(random_bytes(4));
+    $function = 'get_menu_' . $name;
+
+    file_put_contents(
+        $dir . '/' . $name . '.inc.php',
+        "<?php\nfunction $function(array \$args): array\n{\n    return [\n        'label' => 'プラグイン' . \$args['suffix'],\n        'html' => '<p>サブページHTML</p>',\n    ];\n}\n",
+    );
+
+    try {
+        $plugins = load_menu_plugins(['suffix' => '確認'], $dir);
+        assert_same(1, count($plugins), 'One menu plugin should be loaded.');
+        assert_same($name, $plugins[0]['name'], 'Plugin name mismatch.');
+        assert_same('プラグイン確認', $plugins[0]['label'], 'Plugin label mismatch.');
+        assert_same('<p>サブページHTML</p>', $plugins[0]['html'], 'Plugin HTML mismatch.');
+    } finally {
+        remove_tree($dir);
+    }
+}
+
 /**
  * @return resource
  */
@@ -283,6 +308,8 @@ function login(HttpClient $client): string
 
 function run_api_tests(): void
 {
+    test_menu_plugin_loader();
+
     $dataDir = sys_get_temp_dir() . '/outline-api-test-' . getmypid() . '-' . bin2hex(random_bytes(4));
     $port = free_port();
     $process = start_server($dataDir, $port);
@@ -392,6 +419,15 @@ function run_api_tests(): void
         ], $csrfToken), 200);
         assert_same($newFileId, $switchedNew['active_file_id'], 'New file should become active again.');
         assert_true(has_node_text($switchedNew['nodes'], 'Only in new file'), 'New file node should remain in the new file.');
+
+        $dice = expect_json($client->request('GET', '/api/plugin.php?name=dice&type=menu&count=2&sides=6'), 200);
+        assert_same(true, $dice['ok'], 'Dice plugin API should succeed.');
+        assert_same(2, $dice['result']['count'], 'Dice count mismatch.');
+        assert_same(6, $dice['result']['sides'], 'Dice sides mismatch.');
+        assert_same(2, count($dice['result']['rolls']), 'Dice roll count mismatch.');
+        foreach ($dice['result']['rolls'] as $roll) {
+            assert_true(is_int($roll) && $roll >= 1 && $roll <= 6, 'Dice roll should be in range.');
+        }
     } finally {
         proc_terminate($process);
         proc_close($process);
